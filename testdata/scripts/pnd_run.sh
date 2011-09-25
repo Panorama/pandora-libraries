@@ -537,6 +537,8 @@ runApp() {
 	fi
 
 	export XDG_CONFIG_HOME="$UNION_MOUNT_DIR/$PND_NAME"
+	export REAL_HOME="$HOME"
+	export HOME="$UNION_MOUNT_DIR/$PND_NAME"
 
 	if echo "$EXENAME"|grep -q ^\.\/;then
 		"$EXENAME" $ARGUMENTS
@@ -551,6 +553,7 @@ runApp() {
 		sleep 10s
 		PID=`pidof -o %PPID -x \"$EXENAME\"`
 	done
+	export HOME="$REAL_HOME"
 	return $RC
 }
 
@@ -604,6 +607,11 @@ main() {
 		if [ ! -z "$CURRENTSPEED" ]; then
 			PND_BeginTask "Reset CPU speed to $CURRENTSPEED"
 			PND_resetCPUSpeed
+			PND_EndTask
+		fi
+		if ! lsof /dev/fb1 > /dev/null; then
+			PND_BeginTask "Restoring the frame buffer status"
+			ofbset -fb /dev/fb1 -mem 0 -size 0 0 -en 0
 			PND_EndTask
 		fi
 		PND_BeginTask "uMount the PND"
