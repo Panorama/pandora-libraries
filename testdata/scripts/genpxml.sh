@@ -4,14 +4,14 @@ help(){
 cat >&2 <<ENDHELP
 $0 [args] :
 -s|--src <src dir>      : Define source directory (default: $SRCDIR)
--n|--name <name>        : Define the pnd base name (default: $PND_NAME)
+-n|--name <name>	: Define the pnd base name (default: $PND_NAME)
 -d|--dest <dest dir>    : Define destination directory (default: $DESTDIR)
 -a|--author <name>      : programmers names (default: $AUTHOR)
 -v|--version <version>  : Define the version (default: $VERSION)
 -w|--website <url>      : Define the url (default: $WEBSITE)
 -b|--build <build id>   : Define the build number (default: $BUILD)
--f|--force              : overide PXML.xml file if found
--h|--help               : show this screen
+-f|--force	      : overide PXML.xml file if found
+-h|--help	       : show this screen
 ENDHELP
 }
 
@@ -22,7 +22,7 @@ DEBUG(){
 buildApplicationList(){
 	#output "<appname> [<desktopfile>]" lines
 	cd $DESTDIR
-	DESTLST=$(find $SRCDIR -name "*desktop";find $DESTDIR -name "*desktop")
+	DESTLST=$(find $SRCDIR -name "*.desktop";find $DESTDIR -name "*.desktop")
 	if [ ! -z "$DESTLST" ];then
 		{
 		for d in $DESTLST;do
@@ -53,6 +53,7 @@ genLaunchScript() {
 	S="$DESTDIR/scripts/$(basename $1).sh"
 	if [ -e $S ];then
 		mv $S ${S}.old
+		chmod -x ${S}.old
 	fi
 	cat>$S<<ENDSCRIPT
 #!/bin/sh
@@ -157,6 +158,12 @@ desktop2application(){ #generate PXML application info out of a desktop file pas
 			echo "      <pic src=\"previews/$(basename $i)\"/>"
 		done
 		echo "    </previewpics>"
+	elif [ $(buildApplicationList|wc -l) -eq 1 ] && [ ! -z "$(find $DESTDIR/previews -type f)" ];then
+		echo "    <previewpics>"
+		for i in $(find $DESTDIR/previews -type f);do
+			echo "      <pic src=\"previews/$(basename $i)\"/>"
+		done
+		echo "    </previewpics>"
 	else
 		cat <<ENDASSO
 <!--
@@ -166,7 +173,16 @@ desktop2application(){ #generate PXML application info out of a desktop file pas
 -->
 ENDASSO
 	fi
-	echo
+
+	# Preview pics ------------------
+	cat <<ENDLICEN
+<!--
+    <licenses>
+      <license name="GPLv3" url="http://www.gnu.org/copyleft/gpl.html" sourcecodeurl="http://www.kernel.org/default"/>
+    </licenses>
+-->
+ENDLICEN
+
 
 	# Documentation -----------------
 	HTML=$(find $DESTDIR -type d -name index.html|head -1)
@@ -235,10 +251,28 @@ genPxml(){
 	if [ -e $DESTDIR/PXML.xml ];then
 		mv $DESTDIR/PXML.xml $DESTDIR/PXML.xml.old
 	fi
+
+        MAJOR=$(echo $VERSION|awk -F. '{print $1}')
+        MINOR=$(echo $VERSION|awk -F. '{print $2}')
+        REL=$(echo $DVERSION|awk -F. '{print $3}')
+        MINOR=${MINOR:-"0"}
+        REL=${REL:-"0"}
+
 	cat >$DESTDIR/PXML.xml <<ENDHEAD
 <?xml version="1.0" encoding="UTF-8"?>
-<PXML xmlns="http://openpandora.org/namespaces/PXML">
+<PXML xmlns="http://openpandora.org/namespaces/PXML" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="PXML_schema.xsd">
 <!-- please see http://pandorawiki.org/PXML_specification for more information before editing, and remember the order does matter -->
+
+   <package id="$PND_NAME">
+           <author name="$AUTHOR" website="$WEBSITE"/>
+           <version major="$MAJOR" minor="$MINOR" release="$REL" build="$BUILD"/>
+           <titles>
+                   <title lang="en_US">$PND_NAME</title>
+           </titles>
+           <descriptions>
+                   <description lang="en_US">$PND_NAME</description>
+           </descriptions>
+   </package>
 
 ENDHEAD
 	if [ ! -d $DESTDIR/previews ];then
@@ -269,11 +303,10 @@ ENDINFO
 
 FORCE=0
 BUILD=1
-AUTHOR=sebt3
-WEBSITE=${WEBSITE:-"http://www..openpandora.org"}
+AUTHOR=${AUTHOR:-${PND_AUTHOR:-"$(whoami)"}}
+WEBSITE=${WEBSITE:-${PND_WEBSITE:-"http://www.openpandora.org/"}}
 SRCDIR=${SRCDIR:-$(pwd)}
-PND_NAME=$PRJ
-PND_NAME=${PND_NAME:-$(basename $SRCDIR|awk -F- '{print $1}')}
+PND_NAME=${PND_NAME:-${PRJ:-$(basename $SRCDIR|awk -F- '{print $1}')}}
 VERSION=${VERSION:-$(basename $SRCDIR|awk -F- '{print $2}')}
 DESTDIR=${DESTDIR:-"/mnt/utmp/$PND_NAME"}
 RND=$RANDOM
