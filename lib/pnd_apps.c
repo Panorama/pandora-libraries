@@ -289,3 +289,4 @@ unsigned char pnd_get_appdata_path ( char *fullpath, char *unique_id, char *r_pa
 
   return ( 1 );
 }
+
