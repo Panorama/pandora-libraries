@@ -20,6 +20,7 @@ int main ( int argc, char *argv[] ) {
   unsigned char do_exec = 0;
   unsigned char do_icon = 0;
   unsigned char do_dotdesktop = 0;
+  char dotdesktoppath [ 1024 ] = "";
 
   for ( i = 1; i < argc; i++ ) {
 
@@ -32,11 +33,15 @@ int main ( int argc, char *argv[] ) {
     } else if ( argv [ i ][ 0 ] == '-' && argv [ i ][ 1 ] == 'd' ) {
       printf ( "Will attempt to extract dotdesktop.\n" );
       do_dotdesktop = 1;
+    } else if ( strstr ( argv [ i ], ".desktop" ) ) {
+      strncpy ( dotdesktoppath, argv [ i ], 1023 );
+      printf ( "Will scan '%s' instead of performing discovery\n", dotdesktoppath );
     } else {
-      printf ( "%s [-e] [-i] [-d]\n", argv [ 0 ] );
+      printf ( "%s [-e] [-i] [-d] [dotdesktop-file]\n", argv [ 0 ] );
       printf ( "-e\tOptional. Attempt to exec a random app.\n" );
       printf ( "-i\tOptional. Attempt to dump icon files from the end of pnd's to ./testdata/dotdesktop.\n" );
       printf ( "-d\tOptional. Attempt to dump dotdesktop files from the end of pnd's to ./testdata/dotdesktop.\n" );
+      printf ( "dotdesktop-file\tIf path specified and ends with .desktop, try to scan that .desktop instead of pnd-discovery\n" );
       exit ( 0 );
     }
 
@@ -109,7 +114,17 @@ int main ( int argc, char *argv[] ) {
    */
   pnd_box_handle applist;
 
-  applist = pnd_disco_search ( appspath, overridespath );
+  if ( dotdesktoppath [ 0 ] ) {
+    pnd_disco_t *p = pnd_parse_dotdesktop ( dotdesktoppath );
+    pnd_box_handle disco_box = pnd_box_new ( "discovery" );
+    if ( p ) {
+      pnd_disco_t *ai = pnd_box_allocinsert ( disco_box, dotdesktoppath, sizeof(pnd_disco_t) );
+      memmove ( ai, p, sizeof(pnd_disco_t) );
+    }
+    applist = disco_box;
+  } else {
+    applist = pnd_disco_search ( appspath, overridespath );
+  }
 
   // list the found apps (if any)
 

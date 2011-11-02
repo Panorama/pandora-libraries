@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h> /* for unlink */
 #include <stdlib.h> /* for free */
+#include <sys/stat.h> /* for stat */
 
 #include "pnd_apps.h"
 #include "pnd_container.h"
@@ -723,4 +724,130 @@ unsigned char *pnd_emit_icon_to_buffer ( pnd_disco_t *p, unsigned int *r_buflen 
   fclose ( pnd );
 
   return ( target );
+}
+
+// parse_dotdesktop() can be used to read a libpnd generated .desktop and return a limited
+// but useful disco-t structure back; possibly useful for scanning .desktops rather than
+// scanning pnd-files?
+pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath ) {
+
+  // will verify the .desktop has the libpnd-marking on it (X-Pandora-Source): PND_DOTDESKTOP_SOURCE
+
+  // attempt to extract..
+  // - unique-id (from filename or field)
+  // - subapp number (from filename)
+  // - exec required info
+  // - icon path
+  // - name (title-en)
+  // - comment (desc-en)
+  // - option_no_x11
+  // - object path
+  // - appdata name (or unique-id if not present)
+  // - start dir
+  // - args
+  // - clockspeed
+  // - categories
+
+  // determine file length
+  struct stat statbuf;
+
+  if ( stat ( ddpath, &statbuf) < 0 ) {
+    return ( NULL ); // couldn't open
+  }
+
+  // buffers..
+  char dd [ 1024 ];
+  unsigned char libpnd_origin = 0;
+
+  // disco
+  pnd_disco_t *p = malloc ( sizeof(pnd_disco_t) );
+  if ( ! p ) {
+    return ( NULL );
+  }
+  bzero ( p, sizeof(pnd_disco_t) );
+
+  // inhale file
+  FILE *f = fopen ( ddpath, "r" );
+
+  if ( ! f ) {
+    return ( NULL ); // not up or shut up!
+  }
+
+  while ( fgets ( dd, 1024, f ) ) {
+    char *nl = strchr ( dd, '\n' );
+    if ( nl ) {
+      *nl = '\0';
+    }
+
+    // grep
+    //
+
+    if ( strncmp ( dd, "Name=", 5 ) == 0 ) {
+      p -> title_en = strdup ( dd + 5 );
+    } else if ( strncmp ( dd, "Icon=", 5 ) == 0 ) {
+      p -> icon = strdup ( dd + 5 );
+    } else if ( strcmp ( dd, PND_DOTDESKTOP_SOURCE ) == 0 ) {
+      libpnd_origin = 1;
+    } else if ( strncmp ( dd, "X-Pandora-UID=", 14 ) == 0 ) {
+      p -> unique_id = strdup ( dd + 14 );
+    } else if ( strncmp ( dd, "Comment=", 8 ) == 0 ) {
+      p -> desc_en = strdup ( dd + 8 );
+    } else if ( strncmp ( dd, "Exec=", 5 ) == 0 ) {
+
+      char *e = strstr ( dd, " -e " );
+      if ( e ) {
+	e += 5;
+
+	char *space = strchr ( e, ' ' );
+	p -> exec = strndup ( e, space - e - 1 );
+      }
+
+      char *b = strstr ( dd, " -b " );
+      if ( b ) {
+	b += 5;
+	char *space = strchr ( b, '\0' );
+	p -> appdata_dirname = strndup ( b, space - b - 1 );
+      }
+
+    } else if ( strncmp ( dd, "Categories=", 11 ) == 0 ) {
+      // HACK; only honours first category
+      char *semi = strchr ( dd, ';' );
+      if ( semi ) {
+	p -> main_category = strndup ( dd + 11, semi - dd + 11 );
+      } else {
+	p -> main_category = strdup ( dd + 11 );
+      }
+      semi = strchr ( p -> main_category, ';' );
+      if ( semi ) {
+	*semi = '\0';
+      }
+    }
+
+    //
+    // /grep
+
+  } // while
+
+  fclose ( f );
+
+  // filter
+  if ( ! libpnd_origin ) {
+    pnd_disco_destroy ( p );
+    free ( p );
+    return ( NULL );
+  }
+
+  // additional
+  p -> object_type = pnd_object_type_pnd;
+  char *slash = strrchr ( ddpath, '/' );
+  if ( slash ) {
+    p -> object_path = strndup ( ddpath, slash - ddpath );
+    p -> object_filename = strdup ( slash + 1 );
+  } else {
+    p -> object_path = "./";
+    p -> object_filename = strdup ( ddpath );
+  }
+
+  // return disco-t
+  return ( p );
 }
