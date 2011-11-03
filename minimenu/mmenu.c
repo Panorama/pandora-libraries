@@ -51,6 +51,7 @@
 #include "pnd_notify.h"
 #include "pnd_dbusnotify.h"
 #include "pnd_apps.h"
+#include "pnd_desktop.h"
 
 #include "mmenu.h"
 #include "mmwrapcmd.h"
@@ -495,87 +496,158 @@ void applications_scan ( void ) {
   g_active_apps = 0;
   pnd_box_handle merge_apps = 0;
 
-  // desktop apps?
-  if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.desktop_apps", 1 ) ) {
-    pnd_log ( pndn_debug, "Looking for pnd applications here: %s\n",
-	      pnd_conf_get_as_char ( g_desktopconf, "desktop.searchpath" ) );
-    g_active_apps = pnd_disco_search ( pnd_conf_get_as_char ( g_desktopconf, "desktop.searchpath" ), NULL );
-  }
+  // boy I wish I built a plugin system here
+  //
 
-  // menu apps?
-  if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.menu_apps", 1 ) ) {
-    pnd_log ( pndn_debug, "Looking for pnd applications here: %s\n",
-	      pnd_conf_get_as_char ( g_desktopconf, "menu.searchpath" ) );
-    merge_apps = pnd_disco_search ( pnd_conf_get_as_char ( g_desktopconf, "menu.searchpath" ), NULL );
-  }
+  // perform application discovery for pnd-files?
+  //
+  if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.disco_pnds", 1 ) ) {
 
-  // merge lists
-  if ( merge_apps ) {
-    if ( g_active_apps ) {
-      // the key from pnd_disco_search() is the _path_, so easy to look for duplicates
-      // this is pretty inefficient, being linked lists; perhaps should switch to hash tables when
-      // we expect thousands of apps.. or at least an index or something.
-      void *a = pnd_box_get_head ( merge_apps );
-      void *nexta = NULL;
-      while ( a ) {
-	nexta = pnd_box_get_next ( a );
+    // desktop apps?
+    if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.desktop_apps", 1 ) ) {
+      pnd_log ( pndn_debug, "Looking for pnd applications here: %s\n",
+		pnd_conf_get_as_char ( g_desktopconf, "desktop.searchpath" ) );
+      g_active_apps = pnd_disco_search ( pnd_conf_get_as_char ( g_desktopconf, "desktop.searchpath" ), NULL );
+    }
 
-	// if the key for the node is also found in active apps, toss out the merging one
-	if ( pnd_box_find_by_key ( g_active_apps, pnd_box_get_key ( a ) ) ) {
-	  //fprintf ( stderr, "Merging app id '%s' is duplicate; discarding it.\n", pnd_box_get_key ( a ) );
-	  pnd_box_delete_node ( merge_apps, a );
+    // menu apps?
+    if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.menu_apps", 1 ) ) {
+      pnd_log ( pndn_debug, "Looking for pnd applications here: %s\n",
+		pnd_conf_get_as_char ( g_desktopconf, "menu.searchpath" ) );
+      merge_apps = pnd_disco_search ( pnd_conf_get_as_char ( g_desktopconf, "menu.searchpath" ), NULL );
+    }
+
+    // merge lists
+    if ( merge_apps ) {
+      if ( g_active_apps ) {
+	// the key from pnd_disco_search() is the _path_, so easy to look for duplicates
+	// this is pretty inefficient, being linked lists; perhaps should switch to hash tables when
+	// we expect thousands of apps.. or at least an index or something.
+	void *a = pnd_box_get_head ( merge_apps );
+	void *nexta = NULL;
+	while ( a ) {
+	  nexta = pnd_box_get_next ( a );
+
+	  // if the key for the node is also found in active apps, toss out the merging one
+	  if ( pnd_box_find_by_key ( g_active_apps, pnd_box_get_key ( a ) ) ) {
+	    //fprintf ( stderr, "Merging app id '%s' is duplicate; discarding it.\n", pnd_box_get_key ( a ) );
+	    pnd_box_delete_node ( merge_apps, a );
+	  }
+
+	  a = nexta;
 	}
 
-	a = nexta;
+	// got menu apps, and got desktop apps, merge
+	pnd_box_append ( g_active_apps, merge_apps );
+      } else {
+	// got menu apps, had no desktop apps, so just assign
+	g_active_apps = merge_apps;
       }
-
-      // got menu apps, and got desktop apps, merge
-      pnd_box_append ( g_active_apps, merge_apps );
-    } else {
-      // got menu apps, had no desktop apps, so just assign
-      g_active_apps = merge_apps;
     }
-  }
 
-  // aux apps?
-  char *aux_apps = NULL;
-  merge_apps = 0;
-  aux_apps = pnd_conf_get_as_char ( g_conf, "minimenu.aux_searchpath" );
-  if ( aux_apps && aux_apps [ 0 ] ) {
-    pnd_log ( pndn_debug, "Looking for pnd applications here: %s\n", aux_apps );
-    merge_apps = pnd_disco_search ( aux_apps, NULL );
-  }
+    // aux apps?
+    char *aux_apps = NULL;
+    merge_apps = 0;
+    aux_apps = pnd_conf_get_as_char ( g_conf, "minimenu.aux_searchpath" );
+    if ( aux_apps && aux_apps [ 0 ] ) {
+      pnd_log ( pndn_debug, "Looking for pnd applications here: %s\n", aux_apps );
+      merge_apps = pnd_disco_search ( aux_apps, NULL );
+    }
 
-  // merge aux apps
-  if ( merge_apps ) {
-    if ( g_active_apps ) {
+    // merge aux apps
+    if ( merge_apps ) {
+      if ( g_active_apps ) {
 
-      // LAME: snipped from above; should just catenate the 3 sets of searchpaths into a
-      // master searchpath, possibly removing duplicate paths _then_, and keep all this much
-      // more efficient
+	// LAME: snipped from above; should just catenate the 3 sets of searchpaths into a
+	// master searchpath, possibly removing duplicate paths _then_, and keep all this much
+	// more efficient
 
-      // the key from pnd_disco_search() is the _path_, so easy to look for duplicates
-      // this is pretty inefficient, being linked lists; perhaps should switch to hash tables when
-      // we expect thousands of apps.. or at least an index or something.
-      void *a = pnd_box_get_head ( merge_apps );
-      void *nexta = NULL;
-      while ( a ) {
-	nexta = pnd_box_get_next ( a );
+	// the key from pnd_disco_search() is the _path_, so easy to look for duplicates
+	// this is pretty inefficient, being linked lists; perhaps should switch to hash tables when
+	// we expect thousands of apps.. or at least an index or something.
+	void *a = pnd_box_get_head ( merge_apps );
+	void *nexta = NULL;
+	while ( a ) {
+	  nexta = pnd_box_get_next ( a );
 
-	// if the key for the node is also found in active apps, toss out the merging one
-	if ( pnd_box_find_by_key ( g_active_apps, pnd_box_get_key ( a ) ) ) {
-	  fprintf ( stderr, "Merging app id '%s' is duplicate; discarding it.\n", pnd_box_get_key ( a ) );
-	  pnd_box_delete_node ( merge_apps, a );
+	  // if the key for the node is also found in active apps, toss out the merging one
+	  if ( pnd_box_find_by_key ( g_active_apps, pnd_box_get_key ( a ) ) ) {
+	    fprintf ( stderr, "Merging app id '%s' is duplicate; discarding it.\n", pnd_box_get_key ( a ) );
+	    pnd_box_delete_node ( merge_apps, a );
+	  }
+
+	  a = nexta;
 	}
 
-	a = nexta;
+	pnd_box_append ( g_active_apps, merge_apps );
+      } else {
+	g_active_apps = merge_apps;
+      }
+    }
+
+  } // app discovery on pnd-files?
+
+  // perform app discovery on .desktop files?
+  //
+  if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.disco_dotdesktop", 0 ) ) {
+    char *chunks[5] = {
+      pnd_conf_get_as_char ( g_desktopconf, "desktop.dotdesktoppath" ),
+      pnd_conf_get_as_char ( g_desktopconf, "menu.dotdesktoppath" ),
+      //"/usr/share/applications",
+      NULL
+    };
+    char ddpath [ 1024 ];
+    unsigned int flags = PND_DOTDESKTOP_LIBPND_ONLY;
+
+    if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.disco_dotdesktop_all", 0 ) ) {
+      flags = 0; // get all
+    }
+
+    // app box?
+    if ( ! g_active_apps ) {
+      g_active_apps = pnd_box_new ( "discovery-dotdesktop" );
+    }
+
+    // for each searchpath..
+    unsigned char i;
+    for ( i = 0; i < 5; i++ ) {
+
+      if ( ! chunks [ i ] ) {
+	break;
       }
 
-      pnd_box_append ( g_active_apps, merge_apps );
-    } else {
-      g_active_apps = merge_apps;
-    }
-  }
+      DIR *d = opendir ( chunks [ i ] );
+
+      if ( d ) {
+	struct dirent *de = readdir ( d );
+
+	// for each filename found
+	while ( de ) {
+
+	  if ( strcmp ( de -> d_name, "." ) == 0 ) {
+	    // irrelevent
+	  } else if ( strcmp ( de -> d_name, ".." ) == 0 ) {
+	    // irrelevent
+	  } else {
+	    snprintf ( ddpath, 1024, "%s/%s", chunks [ i ], de -> d_name );
+	    pnd_disco_t *p = pnd_parse_dotdesktop ( ddpath, flags );
+	    if ( p ) {
+	      pnd_disco_t *ai = pnd_box_allocinsert ( g_active_apps, ddpath, sizeof(pnd_disco_t) );
+	      memmove ( ai, p, sizeof(pnd_disco_t) );
+	    }
+	  }
+
+	  // next!
+	  de = readdir ( d );
+	}
+
+	closedir ( d );
+
+      } // for each dir
+
+    } // for each searchpath
+
+  } // app discovery in .desktops
 
   // do it
   g_active_appcount = pnd_box_get_size ( g_active_apps );
@@ -640,11 +712,21 @@ void applications_scan ( void ) {
 
     // cache the icon, unless deferred
     if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.load_icons_later", 0 ) == 0 ) {
-      if ( iter -> pnd_icon_pos &&
-	   ! cache_icon ( iter, maxwidth, maxheight ) )
+
+      // if app was from a pnd and has an icon-pos (we've already found where it is in the binary),
+      // OR its a .desktop and we've got a path
+      // THEN go try to cache/load the icon
+      if ( ( iter -> pnd_icon_pos ) ||
+	   ( iter -> icon && iter -> object_flags & PND_DISCO_CUSTOM1 )
+	 )
       {
-	pnd_log ( pndn_warning, "  Couldn't load icon: '%s'\n", IFNULL(iter->title_en,"No Name") );
+
+	if ( ! cache_icon ( iter, maxwidth, maxheight ) ) {
+	  pnd_log ( pndn_warning, "  WARNING: Couldn't load icon: '%s'\n", IFNULL(iter->title_en,"No Name") );
+	}
+
       }
+
     }
 
     // cache the preview --> SHOULD DEFER
@@ -738,6 +820,9 @@ void applications_scan ( void ) {
 
   // let deferred icon cache go now
   ui_post_scan();
+
+  // log completion
+  pnd_log ( pndn_debug, "Applications scan done.\n" );
 
   return;
 }

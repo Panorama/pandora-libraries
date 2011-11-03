@@ -748,6 +748,22 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
   // - clockspeed
   // - categories
 
+  char pndpath [ 1024 ];
+  bzero ( pndpath, 1024 );
+
+  // filter on filename?
+  if ( flags & PND_DOTDESKTOP_LIBPND_ONLY ) {
+    // too bad we didn't put some libpnd token at the front of the filename or something
+    // hell, we should cleanse unique-id to ensure its not full of special chars like '*' and '..'.. eep!
+    if ( strrchr ( ddpath, '#' ) == NULL ) { // but if requiring libpnd, we can at least check for #subapp-number
+      return ( NULL );
+    }
+  }
+
+  if ( strstr ( ddpath, ".desktop" ) == NULL ) {
+    return ( NULL );
+  }
+
   // determine file length
   struct stat statbuf;
 
@@ -784,6 +800,8 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
 
     if ( strncmp ( dd, "Name=", 5 ) == 0 ) {
       p -> title_en = strdup ( dd + 5 );
+    } else if ( strncmp ( dd, "Name[en]=", 9 ) == 0 ) {
+      p -> title_en = strdup ( dd + 9 );
     } else if ( strncmp ( dd, "Icon=", 5 ) == 0 ) {
       p -> icon = strdup ( dd + 5 );
     } else if ( strcmp ( dd, PND_DOTDESKTOP_SOURCE ) == 0 ) {
@@ -792,21 +810,39 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
       p -> unique_id = strdup ( dd + 14 );
     } else if ( strncmp ( dd, "Comment=", 8 ) == 0 ) {
       p -> desc_en = strdup ( dd + 8 );
+    } else if ( strncmp ( dd, "Comment[en]=", 12 ) == 0 ) {
+      p -> desc_en = strdup ( dd + 12 );
     } else if ( strncmp ( dd, "Exec=", 5 ) == 0 ) {
 
       char *e = strstr ( dd, " -e " );
+
       if ( e ) {
-	e += 5;
+	// probably libpnd app
 
-	char *space = strchr ( e, ' ' );
-	p -> exec = strndup ( e, space - e - 1 );
-      }
+	if ( e ) {
+	  e += 5;
 
-      char *b = strstr ( dd, " -b " );
-      if ( b ) {
-	b += 5;
-	char *space = strchr ( b, '\0' );
-	p -> appdata_dirname = strndup ( b, space - b - 1 );
+	  char *space = strchr ( e, ' ' );
+	  p -> exec = strndup ( e, space - e - 1 );
+	}
+
+	char *b = strstr ( dd, " -b " );
+	if ( b ) {
+	  b += 5;
+	  char *space = strchr ( b, '\0' );
+	  p -> appdata_dirname = strndup ( b, space - b - 1 );
+	}
+
+	char *p = strstr ( dd, " -p " );
+	if ( p ) {
+	  p += 5;
+	  char *space = strchr ( p, ' ' );
+	  strncpy ( pndpath, p, space - p - 1 );
+	}
+
+      } else {
+	// probably not libpnd app
+	p -> exec = strdup ( dd + 5 );
       }
 
     } else if ( strncmp ( dd, "Categories=", 11 ) == 0 ) {
@@ -832,7 +868,6 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
 
   // filter
   if ( ! libpnd_origin ) {
-    p -> object_flags |= PND_DISCO_CUSTOM1; // so caller can do something if it wishes
 
     // convenience flag
     if ( flags & PND_DOTDESKTOP_LIBPND_ONLY ) {
@@ -841,18 +876,52 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
       return ( NULL );
     }
 
+  } else {
+    p -> object_flags |= PND_DISCO_CUSTOM1; // so caller can do something if it wishes
+  }
+
+  // filter on content
+  if ( ( ! p -> title_en ) ||
+       ( ! p -> exec )
+     )
+  {
+    pnd_disco_destroy ( p );
+    free ( p );
+    return ( NULL );
+  }
+
+  if ( ! p -> unique_id ) {
+    if ( flags & PND_DOTDESKTOP_LIBPND_ONLY ) {
+      pnd_disco_destroy ( p );
+      free ( p );
+      return ( NULL );
+    } else {
+      char hack [ 100 ];
+      snprintf ( hack, 100, "inode-%lu", statbuf.st_ino );
+      p -> unique_id = strdup ( hack );
+    }
   }
 
   // additional
   p -> object_type = pnd_object_type_pnd;
-  char *slash = strrchr ( ddpath, '/' );
+
+  char *source;
+  if ( pndpath [ 0 ] ) {
+    source = pndpath;
+  } else {
+    source = ddpath;
+  }
+
+  char *slash = strrchr ( source, '/' );
   if ( slash ) {
-    p -> object_path = strndup ( ddpath, slash - ddpath );
+    p -> object_path = strndup ( source, slash - source );
     p -> object_filename = strdup ( slash + 1 );
   } else {
     p -> object_path = "./";
-    p -> object_filename = strdup ( ddpath );
+    p -> object_filename = strdup ( source );
   }
+
+  fprintf ( stderr, "object %s /// src %s /// %s /// %s\n", ddpath, source, p -> object_path, p -> object_filename );
 
   // return disco-t
   return ( p );
