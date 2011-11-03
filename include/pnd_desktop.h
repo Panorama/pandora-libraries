@@ -14,7 +14,9 @@ extern "C" {
 #define PND_DOTDESKTOP_HEADER "[Desktop Entry]"
 #define PND_DOTDESKTOP_SOURCE "X-Pandora-Source=libpnd"
 unsigned char pnd_emit_dotdesktop ( char *targetpath, char *pndrun, pnd_disco_t *p );
-pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath );
+
+#define PND_DOTDESKTOP_LIBPND_ONLY 1 /* convenience flag; caller can do this himself as well */
+pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ); // sets object_flag CUSTOM1 for non-libpnd-origin
 
 // emit_dotinfo() will spit out a .desktop 'info entry', similar to the way emit_dotdesktop does its thing
 // - rather than slide this into emit_dotdesktop(), we wish to allow apps to do this or not by calling this

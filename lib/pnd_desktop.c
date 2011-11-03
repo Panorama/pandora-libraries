@@ -729,7 +729,7 @@ unsigned char *pnd_emit_icon_to_buffer ( pnd_disco_t *p, unsigned int *r_buflen 
 // parse_dotdesktop() can be used to read a libpnd generated .desktop and return a limited
 // but useful disco-t structure back; possibly useful for scanning .desktops rather than
 // scanning pnd-files?
-pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath ) {
+pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
 
   // will verify the .desktop has the libpnd-marking on it (X-Pandora-Source): PND_DOTDESKTOP_SOURCE
 
@@ -832,9 +832,15 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath ) {
 
   // filter
   if ( ! libpnd_origin ) {
-    pnd_disco_destroy ( p );
-    free ( p );
-    return ( NULL );
+    p -> object_flags |= PND_DISCO_CUSTOM1; // so caller can do something if it wishes
+
+    // convenience flag
+    if ( flags & PND_DOTDESKTOP_LIBPND_ONLY ) {
+      pnd_disco_destroy ( p );
+      free ( p );
+      return ( NULL );
+    }
+
   }
 
   // additional

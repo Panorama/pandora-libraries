@@ -115,7 +115,7 @@ int main ( int argc, char *argv[] ) {
   pnd_box_handle applist;
 
   if ( dotdesktoppath [ 0 ] ) {
-    pnd_disco_t *p = pnd_parse_dotdesktop ( dotdesktoppath );
+    pnd_disco_t *p = pnd_parse_dotdesktop ( dotdesktoppath, PND_DOTDESKTOP_LIBPND_ONLY );
     pnd_box_handle disco_box = pnd_box_new ( "discovery" );
     if ( p ) {
       pnd_disco_t *ai = pnd_box_allocinsert ( disco_box, dotdesktoppath, sizeof(pnd_disco_t) );
