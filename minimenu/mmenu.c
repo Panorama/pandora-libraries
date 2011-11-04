@@ -662,12 +662,13 @@ void applications_scan ( void ) {
   pnd_log ( pndn_debug, "Found pnd applications, and caching icons:\n" );
   pnd_disco_t *iter = pnd_box_get_head ( g_active_apps );
   unsigned int itercount = 0;
+  unsigned loadlater = pnd_conf_get_as_int_d ( g_conf, "minimenu.load_icons_later", 0 );
   while ( iter ) {
     //pnd_log ( pndn_debug, "  App: '%s'\n", IFNULL(iter->title_en,"No Name") );
 
     // update cachescreen
     // ... every 5 filenames, just to avoid slowing it too much
-    if ( itercount % 5 == 0 ) {
+    if ( loadlater == 0 && itercount % 5 == 0 ) {
       ui_cachescreen ( 0 /* clear screen */, IFNULL(iter->title_en,"No Name") );
     }
 

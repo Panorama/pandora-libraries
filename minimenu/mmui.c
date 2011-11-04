@@ -51,6 +51,10 @@
 #define CHANGED_EVERYTHING  (1<<4)  /* redraw it all! */
 unsigned int render_mask = CHANGED_EVERYTHING;
 
+SDL_Thread *g_icon_thread = NULL;
+unsigned char g_icon_thread_stop = 0; /* if !0 means thread should stop and maim app may block until it goes back to 0.. */
+unsigned char g_icon_thread_busy = 0; /* if !0 means thread is running right now */
+
 #define MIMETYPE_EXE "/usr/bin/file"     /* check for file type prior to invocation */
 
 /* SDL
@@ -91,6 +95,8 @@ unsigned char ui_detail_hidden = 0;     // if >0, detail panel is hidden
 
 static SDL_Surface *ui_scale_image ( SDL_Surface *s, unsigned int maxwidth, int maxheight ); // height -1 means ignore
 static int ui_selected_index ( void );
+static void ui_start_defered_icon_thread ( void );
+static void ui_stop_defered_icon_thread ( void );
 
 unsigned char ui_setup ( void ) {
 
@@ -1986,6 +1992,10 @@ void ui_push_ltrigger ( void ) {
     return;
   }
 
+  if ( g_icon_thread_busy ) {
+    ui_stop_defered_icon_thread();
+  }
+
   if ( ui_category > 0 ) {
     ui_category--;
     category_fs_restock ( g_categories [ ui_category ] );
@@ -2014,6 +2024,7 @@ void ui_push_ltrigger ( void ) {
   ui_rows_scrolled_down = 0;
 
   render_mask |= CHANGED_CATEGORY;
+  ui_start_defered_icon_thread();
 
   return;
 }
@@ -2023,6 +2034,10 @@ void ui_push_rtrigger ( void ) {
 
   if ( g_categorycount == 0 ) {
     return;
+  }
+
+  if ( g_icon_thread_busy ) {
+    ui_stop_defered_icon_thread();
   }
 
   unsigned int screen_width = ui_display_context.screen_width;
@@ -2053,6 +2068,7 @@ void ui_push_rtrigger ( void ) {
   ui_rows_scrolled_down = 0;
 
   render_mask |= CHANGED_CATEGORY;
+  ui_start_defered_icon_thread();
 
   return;
 }
@@ -2620,6 +2636,7 @@ void ui_touch_act ( unsigned int x, unsigned int y ) {
 	render_mask |= CHANGED_CATEGORY;
 	// rescan the dir
 	category_fs_restock ( g_categories [ ui_category ] );
+	ui_start_defered_icon_thread();
       }
 
       break;
@@ -2673,7 +2690,8 @@ int ui_threaded_timer ( pnd_disco_t *p ) {
   while ( 1 ) {
 
     // pause...
-    sleep ( delay_s );
+    //sleep ( delay_s );
+    SDL_Delay ( delay_s * 1000 );
 
     // .. trigger SD check
     SDL_Event e;
@@ -2708,19 +2726,7 @@ unsigned char ui_threaded_defered_preview ( pnd_disco_t *p ) {
   return ( 0 );
 }
 
-SDL_Thread *g_icon_thread = NULL;
 void ui_post_scan ( void ) {
-
-  // if deferred icon load, kick off the thread now
-  if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.load_icons_later", 0 ) == 1 ) {
-
-    g_icon_thread = SDL_CreateThread ( (void*)ui_threaded_defered_icon, NULL );
-
-    if ( ! g_icon_thread ) {
-      pnd_log ( pndn_error, "ERROR: Couldn't create icon thread\n" );
-    }
-
-  } // deferred icon load
 
   // reset view
   ui_selected = NULL;
@@ -2764,43 +2770,72 @@ void ui_post_scan ( void ) {
   // redraw all
   render_mask |= CHANGED_EVERYTHING;
 
+  // if deferred icon load, kick off the thread now
+  if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.load_icons_later", 0 ) == 1 ) {
+    ui_start_defered_icon_thread();
+  } // deferred icon load
+
   return;
 }
 
 unsigned char ui_threaded_defered_icon ( void *p ) {
   extern pnd_box_handle g_active_apps;
-  pnd_box_handle h = g_active_apps;
 
   unsigned char maxwidth, maxheight;
   maxwidth = pnd_conf_get_as_int_d ( g_conf, "grid.icon_max_width", 50 );
   maxheight = pnd_conf_get_as_int_d ( g_conf, "grid.icon_max_height", 50 );
 
-  pnd_disco_t *iter = pnd_box_get_head ( h );
+  pnd_disco_t *iter;
 
-  while ( iter ) {
+  g_icon_thread_busy = 1;
 
-    // cache it
-    if ( iter -> pnd_icon_pos &&
-	 ! cache_icon ( iter, maxwidth, maxheight ) )
+  // work at it in order within current category
+
+  mm_appref_t *refiter = g_categories [ ui_category ] -> refs;
+  while ( refiter && ! g_icon_thread_stop ) {
+    iter = refiter -> ref;
+
+    // has an icon that is not already cached?
+    if ( ( iter -> pnd_icon_pos ) ||
+	 ( iter -> icon && iter -> object_flags & PND_DISCO_CUSTOM1 )
+       )
     {
-      pnd_log ( pndn_warning, "  Couldn't load icon: '%s'\n", IFNULL(iter->title_en,"No Name") );
-    } else {
+  
+      // try to cache it?
+      if ( ! cache_icon ( iter, maxwidth, maxheight ) ) {
+	//pnd_log ( pndn_warning, "  Couldn't load icon: '%s'\n", IFNULL(iter->title_en,"No Name") );
 
-      // trigger that we completed
-      SDL_Event e;
-      bzero ( &e, sizeof(SDL_Event) );
-      e.type = SDL_USEREVENT;
-      e.user.code = sdl_user_finishedicon;
-      SDL_PushEvent ( &e );
+      } else {
 
-      //pnd_log ( pndn_warning, "  Finished deferred load icon: '%s'\n", IFNULL(iter->title_en,"No Name") );
-      usleep ( pnd_conf_get_as_int_d ( g_conf, "minimenu.defer_icon_us", 50000 ) );
+	// trigger that we completed
+	SDL_Event e;
+	bzero ( &e, sizeof(SDL_Event) );
+	e.type = SDL_USEREVENT;
+	e.user.code = sdl_user_finishedicon;
+	SDL_PushEvent ( &e );
 
-    }
+	//pnd_log ( pndn_warning, "  Finished deferred load icon: '%s'\n", IFNULL(iter->title_en,"No Name") );
+	//usleep ( pnd_conf_get_as_int_d ( g_conf, "minimenu.defer_icon_us", 50000 ) );
 
-    // next
-    iter = pnd_box_get_next ( iter );
-  } // while
+      }
+
+      // avoid churn
+      iter -> pnd_icon_pos = 0;
+      if ( iter -> icon ) {
+	free ( iter -> icon );
+	iter -> icon = NULL;
+      }
+
+      // let user do something..
+      SDL_Delay ( 200 );
+
+    } // has icon
+
+    refiter = refiter -> next;
+  }
+
+  // mark as done
+  g_icon_thread_busy = 0;
 
   return ( 0 );
 }
@@ -3184,6 +3219,7 @@ void ui_revealscreen ( void ) {
 
   // redraw tabs
   render_mask |= CHANGED_CATEGORY;
+  ui_start_defered_icon_thread();
 
   return;
 }
@@ -4229,4 +4265,41 @@ char *ui_pick_custom_category ( unsigned char mode ) {
   free ( list );
 
   return ( foo );
+}
+
+void ui_start_defered_icon_thread ( void ) {
+
+  if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.load_icons_later", 0 ) == 0 ) {
+    return;
+  }
+
+  if ( g_icon_thread_busy ) {
+    //fprintf ( stderr, "REM: Waiting for thread to stop..\n" );
+    ui_stop_defered_icon_thread();
+  }
+
+  //fprintf ( stderr, "WARN: Starting new icon caching thread..\n" );
+  g_icon_thread = SDL_CreateThread ( (void*)ui_threaded_defered_icon, NULL );
+
+  if ( ! g_icon_thread ) {
+    pnd_log ( pndn_error, "ERROR: Couldn't create icon thread\n" );
+  }
+
+  return;
+}
+
+void ui_stop_defered_icon_thread ( void ) {
+  time_t started = time ( NULL );
+
+  // ask thread to stop, then wait for it (if two run at same time, or if we change
+  // category content under neath it, could be bad..)
+  g_icon_thread_stop = 1;
+  while ( g_icon_thread_busy ) {
+    time ( NULL ); // spin
+  }
+  g_icon_thread_stop = 0;
+
+  fprintf ( stderr, "REM: Thread stoppage took %u seconds.\n", (int) ( time ( NULL ) - started ) );
+
+  return;
 }

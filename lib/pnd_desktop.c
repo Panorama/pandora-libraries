@@ -921,8 +921,6 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
     p -> object_filename = strdup ( source );
   }
 
-  fprintf ( stderr, "object %s /// src %s /// %s /// %s\n", ddpath, source, p -> object_path, p -> object_filename );
-
   // return disco-t
   return ( p );
 }
