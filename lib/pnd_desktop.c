@@ -84,6 +84,38 @@ unsigned char pnd_emit_dotdesktop ( char *targetpath, char *pndrun, pnd_disco_t 
   }
 #endif
 
+  if ( p -> preview_pic1 ) {
+    fprintf ( f, "X-Pandora-Preview-Pic-1=%s\n", p -> preview_pic1 );
+  }
+
+  if ( p -> clockspeed ) {
+    fprintf ( f, "X-Pandora-Clockspeed=%s\n", p -> clockspeed );
+  }
+
+  if ( p -> startdir ) {
+    fprintf ( f, "X-Pandora-Startdir=%s\n", p -> startdir );
+  }
+
+  if ( p -> main_category ) {
+    fprintf ( f, "X-Pandora-MainCategory=%s\n", p -> main_category );
+  }
+  if ( p -> main_category1 ) {
+    fprintf ( f, "X-Pandora-MainCategory1=%s\n", p -> main_category1 );
+  }
+  if ( p -> main_category2 ) {
+    fprintf ( f, "X-Pandora-MainCategory2=%s\n", p -> main_category2 );
+  }
+
+  if ( p -> alt_category ) {
+    fprintf ( f, "X-Pandora-AltCategory=%s\n", p -> alt_category );
+  }
+  if ( p -> alt_category1 ) {
+    fprintf ( f, "X-Pandora-AltCategory1=%s\n", p -> alt_category1 );
+  }
+  if ( p -> alt_category2 ) {
+    fprintf ( f, "X-Pandora-AltCategory2=%s\n", p -> alt_category2 );
+  }
+
 #if 0 // we let pnd_run.sh command line handle this instead of in .desktop
   if ( p -> startdir ) {
     snprintf ( buffer, 1020, "Path=%s\n", p -> startdir );
@@ -764,6 +796,10 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
     return ( NULL );
   }
 
+  if ( strstr ( ddpath, "info.desktop" ) != NULL ) {
+    return ( NULL );
+  }
+
   // determine file length
   struct stat statbuf;
 
@@ -808,6 +844,27 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
       libpnd_origin = 1;
     } else if ( strncmp ( dd, "X-Pandora-UID=", 14 ) == 0 ) {
       p -> unique_id = strdup ( dd + 14 );
+    } else if ( strncmp ( dd, "X-Pandora-Preview-Pic-1=", 24 ) == 0 ) {
+      p -> preview_pic1 = strdup ( dd + 24 );
+    } else if ( strncmp ( dd, "X-Pandora-Clockspeed=", 21 ) == 0 ) {
+      p -> clockspeed = strdup ( dd + 21 );
+    } else if ( strncmp ( dd, "X-Pandora-Startdir=", 19 ) == 0 ) {
+      p -> startdir = strdup ( dd + 19 );
+
+    } else if ( strncmp ( dd, "X-Pandora-MainCategory=", 23 ) == 0 ) {
+      p -> main_category = strdup ( dd + 23 );
+    } else if ( strncmp ( dd, "X-Pandora-MainCategory1=", 24 ) == 0 ) {
+      p -> main_category1 = strdup ( dd + 24 );
+    } else if ( strncmp ( dd, "X-Pandora-MainCategory2=", 24 ) == 0 ) {
+      p -> main_category2 = strdup ( dd + 24 );
+
+    } else if ( strncmp ( dd, "X-Pandora-AltCategory=", 22 ) == 0 ) {
+      p -> alt_category = strdup ( dd + 22 );
+    } else if ( strncmp ( dd, "X-Pandora-AltCategory1=", 23 ) == 0 ) {
+      p -> alt_category1 = strdup ( dd + 23 );
+    } else if ( strncmp ( dd, "X-Pandora-AltCategory2=", 23 ) == 0 ) {
+      p -> alt_category2 = strdup ( dd + 23 );
+
     } else if ( strncmp ( dd, "Comment=", 8 ) == 0 ) {
       p -> desc_en = strdup ( dd + 8 );
     } else if ( strncmp ( dd, "Comment[en]=", 12 ) == 0 ) {
@@ -845,6 +902,7 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
 	p -> exec = strdup ( dd + 5 );
       }
 
+#if 0 // ignore; using X- categories now
     } else if ( strncmp ( dd, "Categories=", 11 ) == 0 ) {
       // HACK; only honours first category
       char *semi = strchr ( dd, ';' );
@@ -857,6 +915,8 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
       if ( semi ) {
 	*semi = '\0';
       }
+#endif
+
     }
 
     //
