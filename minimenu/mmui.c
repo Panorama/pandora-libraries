@@ -1827,6 +1827,17 @@ void ui_push_exec ( void ) {
   }
   if ( g_categories [ 0 ] ) {
     pnd_conf_set_char ( g_conf, "minimenu.last_known_catname", g_categories [ ui_category ] -> catname );
+
+    // and also the parent cat..
+    if ( g_categories [ ui_category ] -> parent_catname ) {
+      pnd_conf_set_char ( g_conf, "minimenu.last_known_parentcatname", g_categories [ ui_category ] -> parent_catname );
+    } else {
+      char *kv = pnd_box_find_by_key ( g_conf, "minimenu.last_known_parentcatname" );
+      if ( kv ) {
+	pnd_box_delete_node ( g_conf, kv );
+      }
+
+    }
   }
 
   // cache last known cat/app to /tmp, so we can use it again later
@@ -2785,6 +2796,23 @@ void ui_post_scan ( void ) {
 
     if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.start_selected", 0 ) && lastcat ) {
       catpick = lastcat;
+
+      // if this is a subcat, we have some doctoring to do :/ the hackishness is really
+      // starting to show..
+      if ( pnd_conf_get_as_char ( g_conf, "minimenu.last_known_parentcatname" ) ) {
+	// in subcat view, we only have one cat
+	ui_category = 0;
+	ui_catshift = 0;
+	// the cat name to search for is Child*Parent
+	char key [ 512 ];
+	sprintf ( key, "%s*%s",
+		  pnd_conf_get_as_char ( g_conf, "minimenu.last_known_catname" )
+		  , pnd_conf_get_as_char ( g_conf, "minimenu.last_known_parentcatname" ) );
+	category_publish ( CFBYNAME, key );
+	// since we forced it by hand, no need to do a cat-scan below
+	catpick = NULL;
+      }
+
     } else if ( dc ) {
       catpick = dc;
     }

@@ -698,11 +698,15 @@ unsigned char conf_write ( pnd_conf_handle h, char *fullpath ) {
   // make for big dumps erroneously.. hmm :/
   char *previous_unique_id = pnd_conf_get_as_char ( g_conf, "minimenu.last_known_app_uid" );
   char *lastcat = pnd_conf_get_as_char ( g_conf, "minimenu.last_known_catname" );
+  char *lastparentcat = pnd_conf_get_as_char ( g_conf, "minimenu.last_known_parentcatname" );
   if ( previous_unique_id ) {
     fprintf ( f, "%s\t%s\n", "minimenu.last_known_app_uid", previous_unique_id );
   }
   if ( lastcat ) {
     fprintf ( f, "%s\t%s\n", "minimenu.last_known_catname", lastcat );
+  }
+  if ( lastparentcat ) {
+    fprintf ( f, "%s\t%s\n", "minimenu.last_known_parentcatname", lastparentcat );
   }
 
   fclose ( f );
