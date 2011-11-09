@@ -182,7 +182,14 @@ int main ( int argc, char *argv[] ) {
   }
 
   // override mmenu conf via user preference conf
-  conf_merge_into ( conf_determine_location ( g_conf ), g_conf );
+  // first check /tmp location in case we're storing this-session prefs; if not
+  // found, go back to normal NAND copy in homedir
+  struct stat statbuf;
+  if ( stat ( CONF_PREF_TEMPPATH, &statbuf ) == 0 ) {
+    conf_merge_into ( CONF_PREF_TEMPPATH, g_conf );
+  } else {
+    conf_merge_into ( conf_determine_location ( g_conf ), g_conf );
+  }
   conf_setup_missing ( g_conf );
 
   // desktop conf for app finding preferences

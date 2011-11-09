@@ -384,7 +384,32 @@ void ui_render ( void ) {
 #if 1
   // if no selected app yet, select the first one
   if ( ! ui_selected && pnd_conf_get_as_int_d ( g_conf, "minimenu.start_selected", 0 ) ) {
+
+    // pick first visible app
     ui_selected = g_categories [ ui_category ] -> refs;
+
+    // change.. so we pick first visible if option is set .. but now we also try to restore
+    // selection to the last app selected in previous session (if there is one.)
+    char *previous_unique_id = pnd_conf_get_as_char ( g_conf, "minimenu.last_known_app_uid" );
+
+    if ( previous_unique_id ) {
+
+      // 1) we should already be in the right category, since its set in ui_post_scan to minimenu.last_known_catname
+      // 2) so we just pick the app in question..
+      mm_appref_t *previter = g_categories [ ui_category ] -> refs;
+      while ( previter ) {
+	if ( strcmp ( previter -> ref -> unique_id, previous_unique_id ) == 0 ) {
+	  break;
+	}
+	previter = previter -> next;
+      }
+
+      if ( previter ) {
+	ui_selected = previter;
+      }
+
+    } // last known app?
+
   }
 #endif
 
@@ -1401,6 +1426,7 @@ void ui_process_input ( pnd_dbusnotify_handle dbh, pnd_notify_handle nh ) {
 	  // configure mm
 	  unsigned char restart = conf_run_menu ( NULL );
 	  conf_write ( g_conf, conf_determine_location ( g_conf ) );
+	  conf_write ( g_conf, CONF_PREF_TEMPPATH );
 	  if ( restart ) {
 	    emit_and_quit ( MM_RESTART );
 	  }
@@ -1794,6 +1820,17 @@ void ui_push_exec ( void ) {
   if ( ! ui_selected ) {
     return;
   }
+
+  // cache the category/app so we can come back to it another time
+  if ( ui_selected ) {
+    pnd_conf_set_char ( g_conf, "minimenu.last_known_app_uid", ui_selected -> ref -> unique_id );
+  }
+  if ( g_categories [ 0 ] ) {
+    pnd_conf_set_char ( g_conf, "minimenu.last_known_catname", g_categories [ ui_category ] -> catname );
+  }
+
+  // cache last known cat/app to /tmp, so we can use it again later
+  conf_write ( g_conf, CONF_PREF_TEMPPATH );
 
   // was this icon generated from filesystem, or from pnd-file?
   if ( ui_selected -> ref -> object_flags & PND_DISCO_GENERATED ) {
@@ -2275,6 +2312,9 @@ void ui_set_selected ( mm_appref_t *r ) {
 
   render_mask |= CHANGED_SELECTION;
 
+  // preview pic stuff
+  //
+
   if ( ! pnd_conf_get_as_int_d ( g_conf, "minimenu.load_previews_later", 0 ) ) {
     return; // no desire to defer anything
   }
@@ -2735,29 +2775,43 @@ void ui_post_scan ( void ) {
   ui_category = 0;
   ui_catshift = 0;
 
-  // do we have a preferred category to jump to?
+  // do we have a preferred category to jump to? or a last known one?
   char *dc = pnd_conf_get_as_char ( g_conf, "categories.default_cat" );
-  if ( dc ) {
+  char *lastcat = pnd_conf_get_as_char ( g_conf, "minimenu.last_known_catname" );
+  if ( ( dc ) ||
+       ( pnd_conf_get_as_int_d ( g_conf, "minimenu.start_selected", 0 ) && lastcat ) )
+  {
+    char *catpick = NULL;
+
+    if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.start_selected", 0 ) && lastcat ) {
+      catpick = lastcat;
+    } else if ( dc ) {
+      catpick = dc;
+    }
 
     // attempt to find default cat; if we do find it, select it; otherwise
     // default behaviour will pick first cat (ie: usually All)
-    unsigned int i;
-    for ( i = 0; i < g_categorycount; i++ ) {
-      if ( strcasecmp ( g_categories [ i ] -> catname, dc ) == 0 ) {
-	ui_category = i;
-	// ensure visibility
-	unsigned int screen_width = ui_display_context.screen_width;
-	unsigned int tab_width = pnd_conf_get_as_int ( g_conf, "tabs.tab_width" );
-	if ( ui_category > ui_catshift + ( screen_width / tab_width ) - 1 ) {
-	  ui_catshift = ui_category - ( screen_width / tab_width ) + 1;
-	}
-	break;
-      }
-    }
+    if ( catpick ) {
+      unsigned int i;
 
-    if ( i == g_categorycount ) {
-      pnd_log ( pndn_warning, "  User defined default category '%s' but not found, so using default behaviour\n", dc );
-    }
+      for ( i = 0; i < g_categorycount; i++ ) {
+	if ( strcasecmp ( g_categories [ i ] -> catname, catpick ) == 0 ) {
+	  ui_category = i;
+	  // ensure visibility
+	  unsigned int screen_width = ui_display_context.screen_width;
+	  unsigned int tab_width = pnd_conf_get_as_int ( g_conf, "tabs.tab_width" );
+	  if ( ui_category > ui_catshift + ( screen_width / tab_width ) - 1 ) {
+	    ui_catshift = ui_category - ( screen_width / tab_width ) + 1;
+	  }
+	  break;
+	}
+      }
+
+      if ( i == g_categorycount ) {
+	pnd_log ( pndn_warning, "  User defined default category or last known cat '%s' but not found, so using default behaviour\n", catpick );
+      }
+
+    } // cat change?
 
   } // default cat
 
@@ -3435,6 +3489,7 @@ void ui_menu_context ( mm_appref_t *a ) {
 
 	  // write conf, so it will take next time
 	  conf_write ( g_conf, conf_determine_location ( g_conf ) );
+	  conf_write ( g_conf, CONF_PREF_TEMPPATH );
 
 	  // can we just 'hide' this guy without reloading all apps? (this is for you, EvilDragon)
 	  if ( 0 ) {

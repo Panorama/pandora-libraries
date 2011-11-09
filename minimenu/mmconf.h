@@ -41,6 +41,7 @@ unsigned int conf_determine_pagelength ( confitem_t *page );
 void conf_merge_into ( char *fullpath, pnd_conf_handle h ); // merge fullpath as a conf file into 'h'; no turning back.
 unsigned char conf_write ( pnd_conf_handle h, char *fullpath ); // emit a conf file, based on items known to conf-ui
 #define CONF_PREF_FILENAME ".mmpref.conf" // or should be .mmprefrc? tend to use '.conf' already so go with it.
+#define CONF_PREF_TEMPPATH "/tmp/" CONF_PREF_FILENAME
 char *conf_determine_location ( pnd_conf_handle h ); // where to stick the conf file?
 void conf_setup_missing ( pnd_conf_handle h ); // find missing keys, set them to default values
 

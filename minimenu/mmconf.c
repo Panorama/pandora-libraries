@@ -35,7 +35,7 @@ confitem_t page_general[] = {
   { "Detail panel on start?",        "Show or hide the detail panel when menu starts",          "1",                "display.show_detail_pane", ct_boolean },
   { "Sub-categories as folders?",    "If no, uses tabs instead of folders within tabs.",        "1",                "tabs.subcat_as_folders",  ct_boolean },
   { "Sub-category apps in their main cat?","If no, apps with subcategories are only in subcategories","1",          "tabs.subcat_to_parent",   ct_boolean },
-  { "Start with app selected",       "Whethor selection is placed by default or not",           "0",                "minimenu.start_selected", ct_boolean },
+  { "Remember selected app",         "On return to menu select previous app; default to selected", "1",             "minimenu.start_selected", ct_boolean },
   { "Auto discover pnd apps?",       "If no, turn on diectory browser to manually find apps",   "1",                "filesystem.do_pnd_disco", ct_boolean },
   // dropped option -- we now strictly enforce free desktop categories (or user defined, but no more bogus PXML categories)
   //    { "Keep bad categories in Other?", "Lazy dev! Put broken categories into Other to keep clean", "1",               "categories.good_cats_only", ct_boolean },
@@ -692,6 +692,18 @@ unsigned char conf_write ( pnd_conf_handle h, char *fullpath ) {
 
     v = pnd_box_get_next ( v );
   } // while
+
+  // really, should write out keys that are not found in the conf items..
+  // but since g_conf is merged with other conf files, that may just
+  // make for big dumps erroneously.. hmm :/
+  char *previous_unique_id = pnd_conf_get_as_char ( g_conf, "minimenu.last_known_app_uid" );
+  char *lastcat = pnd_conf_get_as_char ( g_conf, "minimenu.last_known_catname" );
+  if ( previous_unique_id ) {
+    fprintf ( f, "%s\t%s\n", "minimenu.last_known_app_uid", previous_unique_id );
+  }
+  if ( lastcat ) {
+    fprintf ( f, "%s\t%s\n", "minimenu.last_known_catname", lastcat );
+  }
 
   fclose ( f );
 
