@@ -2879,7 +2879,7 @@ unsigned char ui_threaded_defered_icon ( void *p ) {
 
     // has an icon that is not already cached?
     if ( ( iter -> pnd_icon_pos ) ||
-	 ( iter -> icon && iter -> object_flags & PND_DISCO_CUSTOM1 )
+	 ( iter -> icon && iter -> object_flags & PND_DISCO_LIBPND_DD )
        )
     {
   
@@ -4351,7 +4351,6 @@ char *ui_pick_custom_category ( unsigned char mode ) {
 }
 
 void ui_start_defered_icon_thread ( void ) {
-
   if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.load_icons_later", 0 ) == 0 ) {
     return;
   }

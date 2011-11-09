@@ -16,7 +16,7 @@ extern "C" {
 unsigned char pnd_emit_dotdesktop ( char *targetpath, char *pndrun, pnd_disco_t *p );
 
 #define PND_DOTDESKTOP_LIBPND_ONLY 1 /* convenience flag; caller can do this himself as well */
-pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ); // sets object_flag CUSTOM1 for libpnd-origin
+pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ); // sets object_flag PND_DISCO_LIBPND_DD for libpnd-origin
 
 // emit_dotinfo() will spit out a .desktop 'info entry', similar to the way emit_dotdesktop does its thing
 // - rather than slide this into emit_dotdesktop(), we wish to allow apps to do this or not by calling this

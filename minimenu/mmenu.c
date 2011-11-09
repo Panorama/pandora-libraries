@@ -597,9 +597,10 @@ void applications_scan ( void ) {
   // perform app discovery on .desktop files?
   //
   if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.disco_dotdesktop", 0 ) ) {
-    char *chunks[5] = {
+    char *chunks[10] = {
       pnd_conf_get_as_char ( g_desktopconf, "desktop.dotdesktoppath" ),
       pnd_conf_get_as_char ( g_desktopconf, "menu.dotdesktoppath" ),
+      pnd_conf_get_as_char ( g_conf, "minimenu.aux_searchpath" ),
       //"/usr/share/applications",
       NULL
     };
@@ -639,8 +640,11 @@ void applications_scan ( void ) {
 	    snprintf ( ddpath, 1024, "%s/%s", chunks [ i ], de -> d_name );
 	    pnd_disco_t *p = pnd_parse_dotdesktop ( ddpath, flags );
 	    if ( p ) {
+	      // store
 	      pnd_disco_t *ai = pnd_box_allocinsert ( g_active_apps, ddpath, sizeof(pnd_disco_t) );
 	      memmove ( ai, p, sizeof(pnd_disco_t) );
+	      // free
+	      free ( p );
 	    }
 	  }
 
@@ -673,9 +677,16 @@ void applications_scan ( void ) {
   while ( iter ) {
     //pnd_log ( pndn_debug, "  App: '%s'\n", IFNULL(iter->title_en,"No Name") );
 
+    // dump
+#if 0
+    printf ( "App %s\t%s\t Cat %s:%s:%s %s:%s:%s\n", iter -> title_en, iter -> unique_id,
+	     iter -> main_category, iter -> main_category1, iter -> main_category2,
+	     iter -> alt_category, iter -> alt_category1, iter -> alt_category2 );
+#endif
+
     // update cachescreen
-    // ... every 5 filenames, just to avoid slowing it too much
-    if ( loadlater == 0 && itercount % 5 == 0 ) {
+    // ... every 10 filenames, just to avoid slowing it too much
+    if ( loadlater == 0 && itercount % 10 == 0 ) {
       ui_cachescreen ( 0 /* clear screen */, IFNULL(iter->title_en,"No Name") );
     }
 
@@ -725,7 +736,7 @@ void applications_scan ( void ) {
       // OR its a .desktop and we've got a path
       // THEN go try to cache/load the icon
       if ( ( iter -> pnd_icon_pos ) ||
-	   ( iter -> icon && iter -> object_flags & PND_DISCO_CUSTOM1 )
+	   ( iter -> icon && iter -> object_flags & PND_DISCO_LIBPND_DD )
 	 )
       {
 

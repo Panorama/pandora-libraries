@@ -937,7 +937,7 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
     }
 
   } else {
-    p -> object_flags |= PND_DISCO_CUSTOM1; // so caller can do something if it wishes
+    p -> object_flags |= PND_DISCO_LIBPND_DD; // so caller can do something if it wishes
   }
 
   // filter on content

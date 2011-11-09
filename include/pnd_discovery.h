@@ -44,8 +44,9 @@ typedef enum {
 // fetch the full PXML and get all the details. But I think we got out of control here :)
 // NOTE: We really need to rework disco-t so it can include non-english titles/desc; perhaps more info as optional,
 //   or a name/value pairing system so it can have extra data in it, without a complex structure.
-#define PND_DISCO_FLAG_OVR 1       // An ovr file was found for this app (not per subapp, just per .pnd)
+#define PND_DISCO_FLAG_OVR  1      // An ovr file was found for this app (not per subapp, just per .pnd)
 #define PND_DISCO_GENERATED 2      // This disco is 'faux', made up and not reflecting a real 'pnd file'
+#define PND_DISCO_LIBPND_DD 4      // This disco is from libpnd .desktop parsing
 #define PND_DISCO_CUSTOM1 (1<<30)  // An app may make use of this bitflag safely
 #define PND_DISCO_CUSTOM2 (1<<31)  // An app may make use of this bitflag safely
 typedef struct {
