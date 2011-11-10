@@ -314,8 +314,8 @@ mountPnd() {
 			#detect fs
 			case $PND_FSTYPE in
 			ISO)
-				/sbin/losetup $FREELOOP "$PND" #attach the pnd to the loop device
-				mntline="mount" #setup the mountline for later
+				/sbin/losetup -r $FREELOOP "$PND" #attach the pnd to the loop device
+				mntline="mount -o ro" #setup the mountline for later
 				mntdev="${FREELOOP}"
 				;;
 			directory)
@@ -325,8 +325,8 @@ mountPnd() {
 				mntdev="${PND}"
 				;;
 			Squashfs)
-				/sbin/losetup $FREELOOP "$PND" #attach the pnd to the loop device
-				mntline="mount -t squashfs"
+				/sbin/losetup -r $FREELOOP "$PND" #attach the pnd to the loop device
+				mntline="mount -t squashfs -o ro"
 				mntdev="${FREELOOP}"
 				;;
 			*)
