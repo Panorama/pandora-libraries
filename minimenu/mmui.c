@@ -1419,6 +1419,8 @@ void ui_process_input ( pnd_dbusnotify_handle dbh, pnd_notify_handle nh ) {
 	  // do nothing
 	  ui_revealscreen();
 	} else if ( sel == 1 ) {
+	  // store conf on exit, so that last app/cat can be cached.. for ED :)
+	  conf_write ( g_conf, conf_determine_location ( g_conf ) );
 	  // shutdown
 	  sprintf ( buffer, "sudo poweroff" );
 	  system ( buffer );
