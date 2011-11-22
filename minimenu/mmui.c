@@ -4397,7 +4397,8 @@ char *ui_pick_custom_category ( unsigned char mode ) {
 }
 
 void ui_start_defered_icon_thread ( void ) {
-  if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.load_icons_later", 0 ) == 0 ) {
+
+  if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.load_icons_later", 0 ) != 1 ) {
     return;
   }
 
