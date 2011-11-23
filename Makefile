@@ -46,24 +46,24 @@ ${SOLIB1}:	${ALLOBJ} ${XMLOBJ}
 	ln -f -s ${SOLIB1} ${SOLIB}
 
 pndnotifyd:	pndnotifyd.o ${SOLIB1}
-	${CC} -lstdc++ -o bin/pndnotifyd pndnotifyd.o ${SOLIB1}
+	${CXX}  -o bin/pndnotifyd pndnotifyd.o ${SOLIB1}
 
 pndvalidator:	pndvalidator.o ${SOLIB1}
-	${CC} -lstdc++ -o bin/pndvalidator pndvalidator.o ${SOLIB1}
+	${CXX} -o bin/pndvalidator pndvalidator.o ${SOLIB1}
 
 pnd_run:	pnd_run.o ${SOLIB1}
-	${CC} -lstdc++ -o bin/pnd_run pnd_run.o ${SOLIB1}
+	${CXX} -o bin/pnd_run pnd_run.o ${SOLIB1}
 
 pnd_info:	pnd_info.o ${SOLIB1}
-	${CC} -lstdc++ -o bin/pnd_info pnd_info.o ${SOLIB1}
+	${CXX} -o bin/pnd_info pnd_info.o ${SOLIB1}
 
 pndevmapperd:	pndevmapperd.o ${SOLIB1}
-	${CC} -lstdc++ -o bin/pndevmapperd pndevmapperd.o ${SOLIB1}
+	${CXX} -o bin/pndevmapperd pndevmapperd.o ${SOLIB1}
 
 mmenu:	mmenu.o mmui.o mmcache.o mmcat.o mmconf.o freedesktop_cats.o mmcustom_cats.o ${SOLIB1}
-	${CC} -lstdc++ -o bin/mmenu mmenu.o mmui.o mmcache.o mmcat.o mmconf.o freedesktop_cats.o mmcustom_cats.o ${SOLIB1} -L${PNDSTUFF}/usr/lib -lSDL -lSDL_image -lSDL_ttf -lSDL_gfx
+	${CXX} -o bin/mmenu mmenu.o mmui.o mmcache.o mmcat.o mmconf.o freedesktop_cats.o mmcustom_cats.o ${SOLIB1} -L${PNDSTUFF}/usr/lib -lSDL -lSDL_image -lSDL_ttf -lSDL_gfx
 mmwrapper:	mmwrapper.o ${SOLIB1}
-	${CC} -lstdc++ -o bin/mmwrapper mmwrapper.o ${SOLIB1}
+	${CXX} -o bin/mmwrapper mmwrapper.o ${SOLIB1}
 
 # deployment and assembly components
 #
@@ -111,28 +111,28 @@ deploy:
 #
 
 conftest:	conftest.o ${LIB}
-	${CC} -lstdc++ -o bin/conftest conftest.o libpnd.a
+	${CXX} -o bin/conftest conftest.o libpnd.a
 
 discotest:	discotest.o ${LIB}
-	${CC} -lstdc++ -o bin/discotest discotest.o libpnd.a
+	${CXX} -o bin/discotest discotest.o libpnd.a
 
 evdevtest:	evdevtest.o ${LIB}
-	${CC} -lstdc++ -o bin/evdevtest evdevtest.o -static libpnd.a
+	${CXX} -o bin/evdevtest evdevtest.o -static libpnd.a
 
 notifytest:	notifytest.o ${LIB}
-	${CC} -lstdc++ -o bin/notifytest notifytest.o libpnd.a
+	${CXX} -o bin/notifytest notifytest.o libpnd.a
 
 locatetest:	locatetest.o ${SOLIB1}
-	${CC} -lstdc++ -o bin/locatetest locatetest.o ${SOLIB1}
+	${CXX} -o bin/locatetest locatetest.o ${SOLIB1}
 
 rawpxmltest:    rawpxmltest.o ${LIB}
-	${CC} -lstdc++ -o bin/rawpxmltest rawpxmltest.o ${LIB}
+	${CXX} -o bin/rawpxmltest rawpxmltest.o ${LIB}
 
 loggertest:	loggertest.o ${LIB}
-	${CC} -lstdc++ -o bin/loggertest loggertest.o libpnd.a
+	${CXX} -o bin/loggertest loggertest.o libpnd.a
 
 dbusnotifytest:	dbusnotifytest.o ${LIB}
-	${CC} -lstdc++ -o bin/dbusnotifytest dbusnotifytest.o libpnd.a
+	${CXX} -o bin/dbusnotifytest dbusnotifytest.o libpnd.a
 
 evtest:	evtest.o
 	${CC} -o bin/evtest evtest.o
