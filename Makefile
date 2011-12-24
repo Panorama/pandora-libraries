@@ -80,6 +80,7 @@ deploy:
 	mkdir -p deployment/etc/pandora/conf
 	mkdir -p deployment/etc/pandora/mmenu/skins/default
 	mkdir -p deployment/etc/pandora/mmenu/skins/perty
+	mkdir -p deployment/etc/pandora/mmenu/skins/clean
 	mkdir -p deployment/usr/lib
 	mkdir -p deployment/usr/bin
 	mkdir -p deployment/usr/pandora/apps
@@ -106,6 +107,7 @@ deploy:
 	cp bin/mmwrapper deployment/usr/bin
 	cp minimenu/skin/default/* deployment/etc/pandora/mmenu/skins/default
 	cp minimenu/skin/perty/* deployment/etc/pandora/mmenu/skins/perty
+	cp minimenu/skin/perty/* deployment/etc/pandora/mmenu/skins/clean
 
 # test tool targets
 #
