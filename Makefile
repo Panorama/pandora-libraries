@@ -107,7 +107,7 @@ deploy:
 	cp bin/mmwrapper deployment/usr/bin
 	cp minimenu/skin/default/* deployment/etc/pandora/mmenu/skins/default
 	cp minimenu/skin/perty/* deployment/etc/pandora/mmenu/skins/perty
-	cp minimenu/skin/perty/* deployment/etc/pandora/mmenu/skins/clean
+	cp minimenu/skin/clean/* deployment/etc/pandora/mmenu/skins/clean
 
 # test tool targets
 #
