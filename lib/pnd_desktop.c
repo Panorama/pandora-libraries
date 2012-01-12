@@ -174,6 +174,17 @@ unsigned char pnd_emit_dotdesktop ( char *targetpath, char *pndrun, pnd_disco_t 
 
     // emit
     fprintf ( f, "%s", buffer );
+
+    // and lets copy in some stuff in case it makes .desktop consumers life easier
+    if ( p -> exec ) { fprintf ( f, "X-Pandora-Exec=%s\n", p -> exec ); }
+    if ( p -> appdata_dirname ) { fprintf ( f, "X-Pandora-Appdata-Dirname=%s\n", p -> appdata_dirname ); }
+    if ( p -> execargs ) { fprintf ( f, "X-Pandora-ExecArgs=%s\n", p -> execargs ); }
+    if ( p -> object_flags & PND_DISCO_FLAG_OVR ) { fprintf ( f, "X-Pandora-Object-Flag-OVR=%s\n", "Yes" ); }
+    if ( p -> object_type == pnd_object_type_pnd ) {
+      fprintf ( f, "X-Pandora-Object-Path=%s\n", p -> object_path );
+      fprintf ( f, "X-Pandora-Object-Filename=%s\n", p -> object_filename );
+    }
+
   }
 
   // categories
@@ -850,6 +861,18 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
       p -> clockspeed = strdup ( dd + 21 );
     } else if ( strncmp ( dd, "X-Pandora-Startdir=", 19 ) == 0 ) {
       p -> startdir = strdup ( dd + 19 );
+    } else if ( strncmp ( dd, "X-Pandora-Appdata-Dirname=", 26 ) == 0 ) {
+      p -> appdata_dirname = strdup ( dd + 26 );
+    } else if ( strncmp ( dd, "X-Pandora-ExecArgs=", 19 ) == 0 ) {
+      p -> execargs = strdup ( dd + 19 );
+    } else if ( strncmp ( dd, "X-Pandora-Exec=", 15 ) == 0 ) {
+      p -> exec = strdup ( dd + 15 );
+    } else if ( strncmp ( dd, "X-Pandora-Object-Path=", 22 ) == 0 ) {
+      p -> object_path = strdup ( dd + 22 );
+    } else if ( strncmp ( dd, "X-Pandora-Object-Filename=", 26 ) == 0 ) {
+      p -> object_filename = strdup ( dd + 26 );
+    } else if ( strncmp ( dd, "X-Pandora-Object-Flag-OVR=", 26 ) == 0 ) {
+      p -> object_flags |= PND_DISCO_FLAG_OVR;
 
     } else if ( strncmp ( dd, "X-Pandora-MainCategory=", 23 ) == 0 ) {
       p -> main_category = strdup ( dd + 23 );
@@ -875,6 +898,7 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
 
       if ( e ) {
 	// probably libpnd app
+#if 0 // no needed due to above X-Pandora attributes
 
 	if ( e ) {
 	  e += 5;
@@ -896,6 +920,7 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
 	  char *space = strchr ( p, ' ' );
 	  strncpy ( pndpath, p, space - p - 1 );
 	}
+#endif
 
       } else {
 	// probably not libpnd app
@@ -965,6 +990,7 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
   // additional
   p -> object_type = pnd_object_type_pnd;
 
+#if 0 // nolonger needed due to above X-Pandora attributes
   char *source;
   if ( pndpath [ 0 ] ) {
     source = pndpath;
@@ -980,6 +1006,7 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
     p -> object_path = "./";
     p -> object_filename = strdup ( source );
   }
+#endif
 
   // return disco-t
   return ( p );
