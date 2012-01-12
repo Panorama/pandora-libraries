@@ -9,7 +9,9 @@
 #include <sys/types.h> /* ditto */
 #include <pwd.h> /* ditto */
 #include <sys/stat.h> /* for fstat */
+#include <errno.h> /* for stat->ENOENT */
 #include <dirent.h> /* for opendir */
+#include <fcntl.h> /* for creat */
 
 #include "pnd_pxml.h"
 #include "pnd_container.h"
@@ -360,4 +362,72 @@ unsigned char pnd_filecopy ( char *sourcepath, char *targetpath ) {
   fclose ( target );
 
   return ( 1 );
+}
+
+unsigned char pnd_lock ( char *lockname ) {
+
+  if ( pnd_is_locked ( lockname ) ) {
+    return ( 0 ); // already locked
+  }
+
+  char fullpath [ PATH_MAX ];
+  int fd;
+
+  snprintf ( fullpath, PATH_MAX, "%s/%s", PND_LOCK_PATH, lockname );
+
+  if ( ( fd = creat ( fullpath, 0400 ) < 0 ) ) {
+    return ( 0 ); // error, yeah, I know, no way to know why it failed..
+  }
+
+  close ( fd );
+
+  return ( 1 );
+}
+
+time_t pnd_is_locked ( char *lockname ) {
+  char fullpath [ PATH_MAX ];
+  int rv;
+  snprintf ( fullpath, PATH_MAX, "%s/%s", PND_LOCK_PATH, lockname );
+
+  struct stat statbuf;
+  rv = stat ( fullpath, &statbuf );
+
+  if ( rv == ENOENT ) {
+    return ( 0 ); // file not existk, so no lock
+  } else if ( rv < 0 ) {
+    return ( 0 ); // assume unlocked for error, so app can continue?
+  }
+
+  return ( statbuf.st_mtime );
+}
+
+void pnd_unlock ( char *lockname ) {
+  char fullpath [ PATH_MAX ];
+  snprintf ( fullpath, PATH_MAX, "%s/%s", PND_LOCK_PATH, lockname );
+
+  unlink ( fullpath );
+
+  return;
+}
+
+unsigned char pnd_wait_for_unlock ( char *lockname, unsigned short int max, unsigned int usec_delta ) {
+
+  // check right off the top
+  if ( ! pnd_is_locked ( lockname ) ) {
+    return ( 1 ); // all clear!
+  }
+
+  unsigned short int count = 0;
+  while ( count < max ) {
+
+    if ( ! pnd_is_locked ( lockname ) ) {
+      return ( 1 ); // all clear!
+    }
+
+    usleep ( usec_delta );
+
+    count++;
+  }
+
+  return ( 0 );
 }

@@ -73,6 +73,7 @@ unsigned char g_info_p = 0; // spit out info .desktops
 
 // constants
 #define PNDNOTIFYD_LOGLEVEL "pndnotifyd.loglevel"
+#define PNDLOCKNAME "pndnotifyd-disco.lock"
 
 // decl's
 void consume_configuration ( void );
@@ -815,6 +816,13 @@ unsigned char perform_discoveries ( char *appspath, char *overridespath,        
   pnd_log ( pndn_rem, "perform discovery - apps: %s, overrides: %s\n", appspath, overridespath );
   pnd_log ( pndn_rem, "                  - emit desktop: %s, icons: %s\n", emitdesktoppath, emiticonpath );
 
+  // do some 'locking'
+  pnd_log ( pndn_rem, "creating lockfile %s", PNDLOCKNAME );
+
+  if ( ! pnd_lock ( PNDLOCKNAME ) ) {
+    // problem .. well, too bad, we need to do this .. proceed!
+  }
+
   // attempt to auto-discover applications in the given path
   applist = pnd_disco_search ( appspath, overridespath );
 
@@ -906,6 +914,10 @@ unsigned char perform_discoveries ( char *appspath, char *overridespath,        
   if ( applist ) {
     pnd_box_delete ( applist ); // does not free the disco_t contents!
   }
+
+  // close the lock
+  pnd_log ( pndn_rem, "clearing lockfile %s", PNDLOCKNAME );
+  pnd_unlock ( PNDLOCKNAME );
 
   return ( 1 );
 }

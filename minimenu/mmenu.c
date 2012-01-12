@@ -37,6 +37,7 @@
 #include <sys/wait.h>
 #include <dirent.h>
 #include <signal.h> // for sigaction
+#include <time.h>
 
 #include "pnd_logger.h"
 #include "pnd_pxml.h"
@@ -60,6 +61,8 @@
 #include "mmcat.h"
 #include "mmui.h"
 #include "mmconf.h"
+
+#define PNDLOCKNAME "pndnotifyd-disco.lock" /* from pndnotifyd */
 
 pnd_box_handle g_active_apps = NULL;
 unsigned int g_active_appcount = 0;
@@ -597,6 +600,35 @@ void applications_scan ( void ) {
   // perform app discovery on .desktop files?
   //
   if ( pnd_conf_get_as_int_d ( g_conf, "minimenu.disco_dotdesktop", 0 ) ) {
+
+    // deal with locks
+    pnd_log ( pndn_debug, "Checking pndnotifyd disco lock %s\n", PNDLOCKNAME );
+
+    //   first, check if lock is 'old' -- maybe locker crashed, or if its old enough.. its just good, right?
+    time_t age = pnd_is_locked ( PNDLOCKNAME );
+
+    if ( age == 0 ) {
+      pnd_log ( pndn_debug, "Lock is all clear %s so no need to wait\n", PNDLOCKNAME );
+
+    } else if ( time ( NULL ) - age > pnd_conf_get_as_int_d ( g_conf, "minimenu.disco_lock_maxage_s", 120 ) ) {
+      // lock seems old, so who cares
+      pnd_log ( pndn_debug, "Lock is OLD so ignoring it: %s\n", PNDLOCKNAME );
+
+    } else {
+      // not too old, so lets wait.. we could be booting up!
+
+      int rv = pnd_wait_for_unlock ( PNDLOCKNAME,
+				     pnd_conf_get_as_int_d ( g_conf, "minimenu.disco_lock_max", 20 ),
+				     pnd_conf_get_as_int_d ( g_conf, "minimenu.disco_lock_usec_delta", 500000 ) );
+      if ( rv ) {
+	pnd_log ( pndn_debug, "Waited for lock and is now clear %s\n", PNDLOCKNAME );
+      } else {
+	pnd_log ( pndn_debug, "Waited for lock and timed out %s .. proceeding anyway.\n", PNDLOCKNAME );
+      }
+
+    } // locking
+
+    // where to scan..
     char *chunks[10] = {
       pnd_conf_get_as_char ( g_desktopconf, "desktop.dotdesktoppath" ),
       pnd_conf_get_as_char ( g_desktopconf, "menu.dotdesktoppath" ),
