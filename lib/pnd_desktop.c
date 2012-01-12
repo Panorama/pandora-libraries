@@ -1008,6 +1008,14 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
   }
 #endif
 
+  // lame guards, in case of lazy consumers and broken .desktop files
+  if ( p -> object_path == NULL ) {
+    p -> object_path = strdup ( "/tmp" );
+  }
+  if ( p -> object_filename == NULL ) {
+    p -> object_filename = strdup ( "" ); // force bad filename
+  }
+
   // return disco-t
   return ( p );
 }
