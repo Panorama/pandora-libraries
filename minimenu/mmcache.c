@@ -263,7 +263,8 @@ unsigned char cache_icon ( pnd_disco_t *app, unsigned char maxwidth, unsigned ch
 
     // making sure the file is at least a few seconds old, to help avoid race condition
     struct stat statbuf;
-    if ( stat ( ovrfile, &statbuf ) == 0 && time ( NULL ) - statbuf.st_mtime > 5 ) { // race with pndnotifyd
+    // *** commented out this stat() 'race test' since it buggers up icon loading at boot, if using .desktop instead of .pnd scanning..
+    if ( stat ( ovrfile, &statbuf ) == 0 /*&& time ( NULL ) - statbuf.st_mtime > 5*/ ) { // race with pndnotifyd
       buflen = statbuf.st_size;
       if ( ( iconbuf = malloc ( statbuf.st_size ) ) ) {
 	int fd = open ( ovrfile, O_RDONLY );

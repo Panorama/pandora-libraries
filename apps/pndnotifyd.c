@@ -316,6 +316,13 @@ int main ( int argc, char *argv[] ) {
       /* run the discovery
        */
 
+      // do some 'locking'
+      pnd_log ( pndn_rem, "creating lockfile %s", PNDLOCKNAME );
+      if ( ! pnd_lock ( PNDLOCKNAME ) ) {
+	// problem .. well, too bad, we need to do this .. proceed!
+      }
+
+      // scan..
       pnd_log ( pndn_rem, "  Scanning desktop paths----------------------------\n" );
       if ( ! perform_discoveries ( desktop_appspath, overridespath, desktop_dotdesktoppath, desktop_iconpath ) ) {
 	pnd_log ( pndn_rem, "    No applications found in desktop search path\n" );
@@ -327,6 +334,10 @@ int main ( int argc, char *argv[] ) {
 	  pnd_log ( pndn_rem, "    No applications found in menu search path\n" );
 	}
       }
+
+      // unlock
+      pnd_log ( pndn_rem, "clearing lockfile %s", PNDLOCKNAME );
+      pnd_unlock ( PNDLOCKNAME );
 
       // if we've got a hup script located, lets invoke it
       if ( pndhup ) {
@@ -816,13 +827,6 @@ unsigned char perform_discoveries ( char *appspath, char *overridespath,        
   pnd_log ( pndn_rem, "perform discovery - apps: %s, overrides: %s\n", appspath, overridespath );
   pnd_log ( pndn_rem, "                  - emit desktop: %s, icons: %s\n", emitdesktoppath, emiticonpath );
 
-  // do some 'locking'
-  pnd_log ( pndn_rem, "creating lockfile %s", PNDLOCKNAME );
-
-  if ( ! pnd_lock ( PNDLOCKNAME ) ) {
-    // problem .. well, too bad, we need to do this .. proceed!
-  }
-
   // attempt to auto-discover applications in the given path
   applist = pnd_disco_search ( appspath, overridespath );
 
@@ -914,10 +918,6 @@ unsigned char perform_discoveries ( char *appspath, char *overridespath,        
   if ( applist ) {
     pnd_box_delete ( applist ); // does not free the disco_t contents!
   }
-
-  // close the lock
-  pnd_log ( pndn_rem, "clearing lockfile %s", PNDLOCKNAME );
-  pnd_unlock ( PNDLOCKNAME );
 
   return ( 1 );
 }

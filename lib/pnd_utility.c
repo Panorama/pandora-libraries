@@ -375,7 +375,7 @@ unsigned char pnd_lock ( char *lockname ) {
 
   snprintf ( fullpath, PATH_MAX, "%s/%s", PND_LOCK_PATH, lockname );
 
-  if ( ( fd = creat ( fullpath, 0400 ) < 0 ) ) {
+  if ( ( fd = creat ( fullpath, 0444 ) < 0 ) ) {
     return ( 0 ); // error, yeah, I know, no way to know why it failed..
   }
 
