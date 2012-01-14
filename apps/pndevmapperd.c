@@ -130,7 +130,7 @@ unsigned char bc_enable = 1;      // enable charger control
 unsigned char bc_stopcap = 99;    // battery capacity threshold as stop condition 1
 unsigned int bc_stopcur = 80000;  // charge current threshold as stop condition 2, in uA
 unsigned char bc_startcap = 95;   // battery capacity threshold to resume charging
-char *bc_charge_device = NULL;    // charger /sys/class/power_supply/ device, changes between kernel versions
+char *bc_charge_devices = NULL;   // charger /sys/class/power_supply/ devices, changes between kernel versions
 
 /* get to it
  */
@@ -439,9 +439,9 @@ int main ( int argc, char *argv[] ) {
     bc_startcap = pnd_conf_get_as_int ( evmaph, "battery_charge.start_capacity" );
     pnd_log ( pndn_rem, "Battery charge start capacity set to %u", bc_startcap );
   }
-  if ( pnd_conf_get_as_char ( evmaph, "battery_charge.device" ) != NULL ) {
-    bc_charge_device = strdup ( pnd_conf_get_as_char ( evmaph, "battery_charge.device" ) );
-    pnd_log ( pndn_rem, "Battery charge device set to %s", bc_charge_device );
+  if ( pnd_conf_get_as_char ( evmaph, "battery_charge.devices" ) != NULL ) {
+    bc_charge_devices = strdup ( pnd_conf_get_as_char ( evmaph, "battery_charge.devices" ) );
+    pnd_log ( pndn_rem, "Battery charge devices set to %s", bc_charge_devices );
   }
 
   /* do we have anything to do?
@@ -920,20 +920,20 @@ void sigalrm_handler ( int n ) {
 
   // charge monitoring
   now = time(NULL);
-  if ( bc_enable && bc_charge_device != NULL && (unsigned int)(now - last_charge_check) > 60 ) {
+  if ( bc_enable && bc_charge_devices != NULL && (unsigned int)(now - last_charge_check) > 60 ) {
 
-    int charge_enabled = pnd_device_get_charger_enable ( bc_charge_device );
+    int charge_enabled = pnd_device_get_charger_enable ( bc_charge_devices );
     if ( charge_enabled < 0 )
       pnd_log ( pndn_error, "ERROR: Couldn't read charger enable control\n" );
     else {
 
       if ( charge_enabled && batlevel >= bc_stopcap && 0 < uamps && uamps < bc_stopcur ) {
         pnd_log ( pndn_debug, "Charge stop conditions reached, disabling charging\n" );
-        pnd_device_set_charger_enable ( bc_charge_device, 0 );
+        pnd_device_set_charger_enable ( bc_charge_devices, 0 );
       }
       else if ( !charge_enabled && batlevel <= bc_startcap ) {
         pnd_log ( pndn_debug, "Charge start conditions reached, enabling charging\n" );
-        pnd_device_set_charger_enable ( bc_charge_device, 1 );
+        pnd_device_set_charger_enable ( bc_charge_devices, 1 );
       }
 
       // for some unknown reason it just stops charging randomly (happens once per week or so),
@@ -942,7 +942,7 @@ void sigalrm_handler ( int n ) {
       // by writing to enable. Doing it occasionally should do no harm even with missing charger.
       if ( batlevel <= bc_startcap && (unsigned int)(now - last_charge_worka) > 20*60 ) {
         pnd_log ( pndn_debug, "Charge workaround trigger\n" );
-        pnd_device_set_charger_enable ( bc_charge_device, 1 );
+        pnd_device_set_charger_enable ( bc_charge_devices, 1 );
         last_charge_worka = now;
       }
     }

@@ -34,4 +34,4 @@ enable             1            # enable charger control?
 stop_capacity      99           # battery capacity threshold as stop condition 1
 stop_current       80000        # charge current threshold as stop condition 2, in uA
 start_capacity     95           # battery capacity threshold to resume charging
-device             twl4030_bci_battery
+devices            twl4030_bci_battery twl4030_ac twl4030_usb

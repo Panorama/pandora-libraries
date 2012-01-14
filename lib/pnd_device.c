@@ -103,27 +103,49 @@ unsigned char pnd_device_get_charge_current ( int *result ) {
   return ( 0 );
 }
 
-int pnd_device_get_charger_enable ( const char *device ) {
+int pnd_device_get_charger_enable ( const char *devices ) {
   char fullname [ 100 ];
   char buffer [ 100 ];
 
-  snprintf ( fullname, sizeof ( fullname ), PND_DEVICE_POWER_BASE "/%s/enable", device );
+  while ( 1 ) {
+    if ( sscanf ( devices, "%99s", buffer ) != 1 ) {
+      break;
+    }
 
-  if ( pnd_device_open_read_close ( fullname, buffer, 100 ) ) {
-    return ( atoi ( buffer ) );
+    while ( isspace ( *devices ) )
+      devices++;
+    devices += strlen ( buffer );
+    snprintf ( fullname, sizeof ( fullname ), PND_DEVICE_POWER_BASE "/%s/enable", buffer );
+
+    /* XXX: only ckecks first good device, but that should be enough for our needs */
+    if ( pnd_device_open_read_close ( fullname, buffer, 100 ) ) {
+      return ( atoi ( buffer ) );
+    }
   }
 
   return ( -1 );
 }
 
-unsigned char pnd_device_set_charger_enable ( const char *device, unsigned char v ) {
+unsigned char pnd_device_set_charger_enable ( const char *devices, unsigned char v ) {
   char fullname [ 100 ];
   char buffer [ 100 ];
+  int ret = 0;
 
-  snprintf ( fullname, sizeof ( fullname ), PND_DEVICE_POWER_BASE "/%s/enable", device );
-  sprintf ( buffer, "%u", v );
+  while ( 1 ) {
+    if ( sscanf ( devices, "%99s", buffer ) != 1 ) {
+      break;
+    }
 
-  return ( pnd_device_open_write_close ( fullname, buffer ) );
+    while ( isspace ( *devices ) )
+      devices++;
+    devices += strlen ( buffer );
+    snprintf ( fullname, sizeof ( fullname ), PND_DEVICE_POWER_BASE "/%s/enable", buffer );
+
+    sprintf ( buffer, "%u", v );
+    ret |= pnd_device_open_write_close ( fullname, buffer );
+  }
+
+  return ( ret );
 }
 
 unsigned char pnd_device_set_led_power_brightness ( unsigned char v ) {
