@@ -2890,7 +2890,7 @@ void ui_post_scan ( void ) {
   } // default cat
 
   // if we're sent right to a dirbrowser tab, restock it now (normally we restock on entry)
-  if ( g_categories [ ui_category ] -> fspath ) {
+  if ( g_categories [ ui_category ] && g_categories [ ui_category ] -> fspath ) {
     printf ( "Restock on start: '%s'\n", g_categories [ ui_category ] -> fspath );
     category_fs_restock ( g_categories [ ui_category ] );
   }
@@ -2919,7 +2919,7 @@ unsigned char ui_threaded_defered_icon ( void *p ) {
 
   // work at it in order within current category
 
-  mm_appref_t *refiter = g_categories [ ui_category ] -> refs;
+  mm_appref_t *refiter = g_categories [ ui_category ] ? g_categories [ ui_category ] -> refs : NULL;
   while ( refiter && ! g_icon_thread_stop ) {
     iter = refiter -> ref;
 
