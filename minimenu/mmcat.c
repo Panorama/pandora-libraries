@@ -786,10 +786,13 @@ void category_publish ( unsigned int filter_mask, char *param ) {
     if ( filter_mask == CFALL ) {
       interested = 1;
     } else if ( filter_mask == CFBYNAME ) {
-      char *foo = strchr ( param, '*' ) + 1;
-      if ( strncasecmp ( iter -> catname, param, strlen ( iter -> catname ) ) == 0 &&
-	   iter -> parent_catname &&
-	   strcasecmp ( iter -> parent_catname, foo ) == 0 )
+      char *foo = strchr ( param, '*' ) + 1;          // where is parent folder in this? ("Game")
+      char catname [ 256 ];
+      memset ( catname, '\0', 256 );
+      strncpy ( catname, param, foo - param - 1 );    // figure out the subfolder name ("Emulator")
+      if ( strcasecmp ( iter -> catname, catname ) == 0 &&     // if the iter cat is same as the desired subfolder cat
+	   iter -> parent_catname &&                           // and we have a parent (since its a subfolder...)
+	   strcasecmp ( iter -> parent_catname, foo ) == 0 )   // and sed parent is the right one (in case of subfolder name reuse in other cats!)
       {
 	interested = 1;
       }

@@ -4158,6 +4158,14 @@ void ui_manage_categories ( void ) {
 	// did the user enter something?
 	if ( changed ) {
 
+	  // for now, force use of '*' into something else as we use * internally :/ (FIXME)
+	  {
+	    char *fixme;
+	    while ( fixme = strchr ( namebuf, '*' ) ) {
+	      *fixme = '_';
+	    }
+	  }
+
 	  // and if so, is it existant already or not?
 	  if ( mmcustom_query ( namebuf, NULL ) ) {
 	    ui_menu_oneby ( "Warning", "B/Enter to accept", "Already a registered category." );
@@ -4200,6 +4208,14 @@ void ui_manage_categories ( void ) {
 
 	  // did the user enter something?
 	  if ( changed ) {
+
+	    // for now, force use of '*' into something else as we use * internally :/ (FIXME)
+	    {
+	      char *fixme;
+	      while ( fixme = strchr ( namebuf, '*' ) ) {
+		*fixme = '_';
+	      }
+	    }
 
 	    // and if so, is it existant already or not?
 	    if ( mmcustom_query ( namebuf, maincat ) ) {
