@@ -712,7 +712,13 @@ void dispatch_key ( int keycode, int val ) {
       // is this a keydown or a keyup?
       if ( val == 1 ) {
 	// keydown
-	g_evmap [ i ].keydown_time = time ( NULL );
+
+	if ( g_evmap [ i ].maxhold == 0 ) {
+	  g_evmap [ i ].keydown_time = 0;
+	  invoke_it = 1;
+	} else {
+	  g_evmap [ i ].keydown_time = time ( NULL );
+	}
 
       } else if ( val == 2 && g_evmap [ i ].keydown_time ) {
 	// key is being held; we should check if max-hold is set
