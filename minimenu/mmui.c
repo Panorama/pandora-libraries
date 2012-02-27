@@ -89,7 +89,7 @@ int ui_rows_scrolled_down = 0;          // number of rows that should be missing
 mm_appref_t *ui_selected = NULL;
 unsigned char ui_category = 0;          // current category
 unsigned char ui_catshift = 0;          // how many cats are offscreen to the left
-ui_viewmode_e ui_viewmode = uiv_list;  // default to traditional icon view; why or why is viewstate not per-viewmode :/
+ui_viewmode_e ui_viewmode = uiv_icons;  // default to traditional icon view; why or why is viewstate not per-viewmode :/
 ui_context_t ui_display_context;        // display paramaters: see mmui_context.h
 unsigned char ui_detail_hidden = 0;     // if >0, detail panel is hidden
 // FUTURE: If multiple panels can be shown/hidden, convert ui_detail_hidden to a bitmask
@@ -1575,6 +1575,7 @@ void ui_process_input ( pnd_dbusnotify_handle dbh, pnd_notify_handle nh ) {
 
       } else if ( event.key.keysym.sym == SDLK_LCTRL /*LALT*/ ) { // select button
 	char *opts [ 20 ] = {
+	  "Toggle view icons<->list",
 	  "Reveal hidden category",
 	  "Shutdown Pandora",
 	  "Configure Minimenu",
@@ -1587,19 +1588,25 @@ void ui_process_input ( pnd_dbusnotify_handle dbh, pnd_notify_handle nh ) {
 	  "Select a Minimenu skin",
 	  "About Minimenu"
 	};
-	int sel = ui_modal_single_menu ( opts, 11, "Minimenu", "Enter to select; other to return." );
+	int sel = ui_modal_single_menu ( opts, 12, "Minimenu", "Enter to select; other to return." );
 
 	char buffer [ 100 ];
 	if ( sel == 0 ) {
+	  if ( ui_viewmode == uiv_list ) {
+	    ui_viewmode = uiv_icons;
+	  } else {
+	    ui_viewmode = uiv_list;
+	  }
+	} else if ( sel == 1 ) {
 	  // do nothing
 	  ui_revealscreen();
-	} else if ( sel == 1 ) {
+	} else if ( sel == 2 ) {
 	  // store conf on exit, so that last app/cat can be cached.. for ED :)
 	  conf_write ( g_conf, conf_determine_location ( g_conf ) );
 	  // shutdown
 	  sprintf ( buffer, "sudo poweroff" );
 	  system ( buffer );
-	} else if ( sel == 2 ) {
+	} else if ( sel == 3 ) {
 	  // configure mm
 	  unsigned char restart = conf_run_menu ( NULL );
 	  conf_write ( g_conf, conf_determine_location ( g_conf ) );
@@ -1607,16 +1614,16 @@ void ui_process_input ( pnd_dbusnotify_handle dbh, pnd_notify_handle nh ) {
 	  if ( restart ) {
 	    emit_and_quit ( MM_RESTART );
 	  }
-	} else if ( sel == 3 ) {
+	} else if ( sel == 4 ) {
 	  // manage custom categories
 	  ui_manage_categories();
-	} else if ( sel == 4 ) {
+	} else if ( sel == 5 ) {
 	  // rescan apps
 	  pnd_log ( pndn_debug, "Freeing up applications\n" );
 	  applications_free();
 	  pnd_log ( pndn_debug, "Rescanning applications\n" );
 	  applications_scan();
-	} else if ( sel == 5 ) {
+	} else if ( sel == 6 ) {
 	  // cache preview to SD now
 	  extern pnd_box_handle g_active_apps;
 	  pnd_box_handle h = g_active_apps;
@@ -1639,7 +1646,7 @@ void ui_process_input ( pnd_dbusnotify_handle dbh, pnd_notify_handle nh ) {
 	    iter = pnd_box_get_next ( iter );
 	  } // while
 
-	} else if ( sel == 6 ) {
+	} else if ( sel == 7 ) {
 	  // run terminal
 	  char *argv[5];
 	  argv [ 0 ] = pnd_conf_get_as_char ( g_conf, "utility.terminal" );
@@ -1649,18 +1656,18 @@ void ui_process_input ( pnd_dbusnotify_handle dbh, pnd_notify_handle nh ) {
 	    ui_forkexec ( argv );
 	  }
 
-	} else if ( sel == 7 ) {
+	} else if ( sel == 8 ) {
 	  char buffer [ PATH_MAX ];
 	  sprintf ( buffer, "%s %s\n", MM_RUN, "/usr/pandora/scripts/op_switchgui.sh" );
 	  emit_and_quit ( buffer );
-	} else if ( sel == 8 ) {
-	  emit_and_quit ( MM_QUIT );
 	} else if ( sel == 9 ) {
+	  emit_and_quit ( MM_QUIT );
+	} else if ( sel == 10 ) {
 	  // select skin
 	  if ( ui_pick_skin() ) {
 	    emit_and_quit ( MM_RESTART );
 	  }
-	} else if ( sel == 10 ) {
+	} else if ( sel == 11 ) {
 	  // about
 	  char buffer [ PATH_MAX ];
 	  sprintf ( buffer, "%s/about.txt", g_skinpath );
