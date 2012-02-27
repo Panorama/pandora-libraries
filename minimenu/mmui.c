@@ -89,11 +89,12 @@ int ui_rows_scrolled_down = 0;          // number of rows that should be missing
 mm_appref_t *ui_selected = NULL;
 unsigned char ui_category = 0;          // current category
 unsigned char ui_catshift = 0;          // how many cats are offscreen to the left
+ui_viewmode_e ui_viewmode = uiv_list;  // default to traditional icon view; why or why is viewstate not per-viewmode :/
 ui_context_t ui_display_context;        // display paramaters: see mmui_context.h
 unsigned char ui_detail_hidden = 0;     // if >0, detail panel is hidden
 // FUTURE: If multiple panels can be shown/hidden, convert ui_detail_hidden to a bitmask
 
-static SDL_Surface *ui_scale_image ( SDL_Surface *s, unsigned int maxwidth, int maxheight ); // height -1 means ignore
+SDL_Surface *ui_scale_image ( SDL_Surface *s, unsigned int maxwidth, int maxheight ); // height -1 means ignore
 static int ui_selected_index ( void );
 static void ui_start_defered_icon_thread ( void );
 static void ui_stop_defered_icon_thread ( void );
@@ -249,6 +250,8 @@ mm_imgcache_t g_imagecache [ IMG_TRUEMAX ] = {
   { IMG_SUBCATFOLDER,         "graphics.IMG_SUBCATFOLDER", "graphics.IMG_FOLDER", },
   { IMG_DOTDOTFOLDER,         "graphics.IMG_DOTDOTFOLDER", "graphics.IMG_FOLDER", },
   { IMG_MAX,                  NULL },
+  { IMG_LIST_ALPHAMASK,       NULL }, // generated
+  { IMG_LIST_ALPHAMASK_W,     NULL }, // generated
 };
 
 unsigned char ui_imagecache ( char *basepath ) {
@@ -302,8 +305,22 @@ unsigned char ui_imagecache ( char *basepath ) {
   } // for
 
   // generated
+  //
+
   //g_imagecache [ IMG_SELECTED_ALPHAMASK ].i = SDL_CreateRGBSurface ( SDL_SWSURFACE, 60, 60, 32, 0xFF0000, 0x00FF00, 0xFF, 0xFF000000 );
   //boxRGBA ( g_imagecache [ IMG_SELECTED_ALPHAMASK ].i, 0, 0, 60, 60, 100, 100, 100, 250 );
+
+  SDL_Surface *p = g_imagecache [ IMG_SELECTED_ALPHAMASK ].i;
+  g_imagecache [ IMG_LIST_ALPHAMASK ].i = SDL_ConvertSurface ( p, p -> format, p -> flags );
+  g_imagecache [ IMG_LIST_ALPHAMASK_W ].i = SDL_ConvertSurface ( p, p -> format, p -> flags );
+
+  g_imagecache [ IMG_LIST_ALPHAMASK ].i =
+    ui_scale_image ( g_imagecache [ IMG_LIST_ALPHAMASK ].i,
+		     pnd_conf_get_as_int ( g_conf, "grid.col_max" ) * pnd_conf_get_as_int ( g_conf, "grid.cell_width" ) , -1 );
+
+  g_imagecache [ IMG_LIST_ALPHAMASK_W ].i =
+    ui_scale_image ( g_imagecache [ IMG_LIST_ALPHAMASK_W ].i,
+		     pnd_conf_get_as_int ( g_conf, "grid.col_max_w" ) * pnd_conf_get_as_int ( g_conf, "grid.cell_width_w" ) , -1 );
 
   // post processing
   //
@@ -360,6 +377,7 @@ void ui_render ( void ) {
   // render everything
   //
   unsigned int icon_rows;
+  unsigned int icon_visible_rows = 0; // list view, max number of visible rows
 
 #define MAXRECTS 200
   SDL_Rect rects [ MAXRECTS ], src;
@@ -375,16 +393,6 @@ void ui_render ( void ) {
   static int load_visible = -1;
   if ( load_visible == -1 ) {
     load_visible = pnd_conf_get_as_int_d ( g_conf, "minimenu.load_visible_icons", 0 );
-  }
-
-  // how many total rows do we need?
-  if ( g_categorycount ) {
-    icon_rows = g_categories [ ui_category ] -> refcount / c -> col_max;
-    if ( g_categories [ ui_category ] -> refcount % c -> col_max > 0 ) {
-      icon_rows++;
-    }
-  } else {
-    icon_rows = 0;
   }
 
 #if 1
@@ -419,6 +427,33 @@ void ui_render ( void ) {
   }
 #endif
 
+  // how many total rows do we need?
+  if ( g_categorycount ) {
+
+    if ( ui_viewmode == uiv_list ) {
+      // in list view, dimension of grid area is ..
+      // grid height == cell-height * row-max
+      // font height == display_context -> text_height
+      // padding == icon_offset_y
+      // max visible --> row-max == grid height / ( font-height + padding )
+
+      icon_rows = g_categories [ ui_category ] -> refcount; // one app per row
+      icon_visible_rows = ( c -> cell_height * c -> row_max ) / ( c -> text_height + c -> icon_offset_y );
+
+    } else {
+
+      icon_rows = g_categories [ ui_category ] -> refcount / c -> col_max;
+      if ( g_categories [ ui_category ] -> refcount % c -> col_max > 0 ) {
+	icon_rows++;
+      }
+
+    }
+
+  } else {
+    icon_rows = 0;
+    icon_visible_rows = 0;
+  }
+
   // reset touchscreen regions
   if ( render_jobs_b ) {
     ui_register_reset();
@@ -432,18 +467,36 @@ void ui_render ( void ) {
       autoscrolled = 0;
 
       int index = ui_selected_index();
-      int topleft = c -> col_max * ui_rows_scrolled_down;
-      int botright = ( c -> col_max * ( ui_rows_scrolled_down + c -> row_max ) - 1 );
 
-      if ( index < topleft ) {
-	ui_rows_scrolled_down -= pnd_conf_get_as_int_d ( g_conf, "grid.scroll_increment", 1 );
-	render_jobs_b |= R_ALL;
-	autoscrolled = 1;
-      } else if ( index > botright ) {
-	ui_rows_scrolled_down += pnd_conf_get_as_int_d ( g_conf, "grid.scroll_increment", 1 );
-	render_jobs_b |= R_ALL;
-	autoscrolled = 1;
-      }
+      if ( ui_viewmode == uiv_list ) {
+
+	if ( index >= ui_rows_scrolled_down + icon_visible_rows ) {
+	  ui_rows_scrolled_down += 1;
+	  autoscrolled = 1;
+	  render_jobs_b |= R_ALL;
+	} else if ( index < ui_rows_scrolled_down ) {
+	  ui_rows_scrolled_down -= 1;
+	  autoscrolled = 1;
+	  render_jobs_b |= R_ALL;
+	}
+
+      } else {
+	// icons
+
+	int topleft = c -> col_max * ui_rows_scrolled_down;
+	int botright = ( c -> col_max * ( ui_rows_scrolled_down + c -> row_max ) - 1 );
+
+	if ( index < topleft ) {
+	  ui_rows_scrolled_down -= pnd_conf_get_as_int_d ( g_conf, "grid.scroll_increment", 1 );
+	  render_jobs_b |= R_ALL;
+	  autoscrolled = 1;
+	} else if ( index > botright ) {
+	  ui_rows_scrolled_down += pnd_conf_get_as_int_d ( g_conf, "grid.scroll_increment", 1 );
+	  render_jobs_b |= R_ALL;
+	  autoscrolled = 1;
+	}
+
+      } // viewmode
 
     } // while autoscrolling
 
@@ -453,7 +506,7 @@ void ui_render ( void ) {
       ui_rows_scrolled_down = icon_rows;
     }
 
-  } // ensire visible
+  } // ensure visible
 
   // render background
   if ( render_jobs_b & R_BG ) {
@@ -717,165 +770,243 @@ void ui_render ( void ) {
       }
     }
 
+    // any apps to render at all?
     if ( g_categories [ ui_category ] -> refs ) {
 
-      appiter = g_categories [ ui_category ] -> refs;
-      row = 0;
-      displayrow = 0;
+      // render grid differently based on view mode..
+      //
+      if ( ui_viewmode == uiv_list ) {
 
-      // until we run out of apps, or run out of space
-      while ( appiter != NULL ) {
+	appiter = g_categories [ ui_category ] -> refs;
+	row = 0; // row under consideration (ie: could be scrolled off)
+	displayrow = 0; // rows displayed
 
-	for ( col = 0; col < c -> col_max && appiter != NULL; col++ ) {
+	while ( appiter != NULL ) {
 
 	  // do we even need to render it? or are we suppressing it due to rows scrolled off the top?
 	  if ( row >= ui_rows_scrolled_down ) {
 
-	    // selected? show hilights
+	    // background hilight
+	    SDL_Surface *hilight = ui_detail_hidden ? g_imagecache [ IMG_LIST_ALPHAMASK_W ].i : g_imagecache [ IMG_LIST_ALPHAMASK ].i;
 	    if ( appiter == ui_selected ) {
-	      SDL_Surface *s = g_imagecache [ IMG_SELECTED_ALPHAMASK ].i;
-	      // icon
-	      //dest -> x = grid_offset_x + ( col * cell_width ) + icon_offset_x + ( ( icon_max_width - s -> w ) / 2 );
-	      dest -> x = c -> grid_offset_x + ( col * c -> cell_width ) + c -> icon_offset_x + c -> sel_icon_offset_x;
-	      //dest -> y = grid_offset_y + ( displayrow * cell_height ) + icon_offset_y + ( ( icon_max_height - s -> h ) / 2 );
-	      dest -> y = c -> grid_offset_y + ( displayrow * c -> cell_height ) + c -> icon_offset_y + c -> sel_icon_offset_y;
-	      SDL_BlitSurface ( s, NULL /* all */, sdl_realscreen, dest );
+	      src.x = 0;
+	      src.y = 0;
+	      src.w = hilight -> w;
+	      src.h = c -> text_height + c -> icon_offset_y;
+	      dest -> x = c -> grid_offset_x + c -> text_clip_x;
+	      dest -> y = c -> grid_offset_y + ( displayrow * ( c -> text_height + c -> icon_offset_y ) ) - ( c -> icon_offset_y / 2 );
+	      SDL_BlitSurface ( hilight, &src, sdl_realscreen, dest );
 	      dest++;
-	      // text
-	      dest -> x = c -> grid_offset_x + ( col * c -> cell_width ) + c -> text_clip_x;
-	      dest -> y = c -> grid_offset_y + ( displayrow * c -> cell_height ) + c -> text_hilite_offset_y;
-	      SDL_BlitSurface ( g_imagecache [ IMG_SELECTED_HILITE ].i, NULL /* all */, sdl_realscreen, dest );
-	      dest++;
-	    } // selected?
+	    }
 
 	    // show icon
 	    mm_cache_t *ic = cache_query_icon ( appiter -> ref -> unique_id );
-	    SDL_Surface *iconsurface;
-
-	    // if icon not in cache, and its a pnd-file source, perhaps try to load it right now..
-	    if ( ( ! ic ) &&
-		 ( load_visible ) &&
-		 ( ! ( appiter -> ref -> object_flags & PND_DISCO_GENERATED ) )
-	       )
-	    {
-	      // try to load any icons that..
-	      // - are not yet loaded
-	      // - did not fail a previous load attempt
-	      // this way user can upfront load all icons, or defer all icons, or even defer all icons
-	      // and still try to load visible ones 'just before needed'; so not at mmenu load time, but
-	      // as needed (only the ones needed.)
-
-	      if ( ( appiter -> ref -> pnd_icon_pos ) ||
-		   ( appiter -> ref -> icon && appiter -> ref -> object_flags & PND_DISCO_LIBPND_DD )
-		 )
-	      {
-  
-		// try to cache it?
-		if ( ! cache_icon ( appiter -> ref, ui_display_context.icon_max_width, ui_display_context.icon_max_width ) ) {
-		  // erm..
-		}
-
-		// avoid churn
-		appiter -> ref -> pnd_icon_pos = 0;
-		if ( appiter -> ref -> icon ) {
-		  free ( appiter -> ref -> icon );
-		  appiter -> ref -> icon = NULL;
-		}
-
-		// pick up as if nothing happened..
-		ic = cache_query_icon ( appiter -> ref -> unique_id );
-
-	      }
-
-	    } // load icon during rendering?
-
 	    if ( ic ) {
-	      iconsurface = ic -> i;
-	    } else {
-	      //pnd_log ( pndn_warning, "WARNING: TBD: Need Missin-icon icon for '%s'\n", IFNULL(appiter -> ref -> title_en,"No Name") );
-
-	      // no icon override; was this a pnd-file (show the unknown icon then), or was this generated from
-	      // filesystem (file or directory icon)
-	      if ( appiter -> ref -> object_flags & PND_DISCO_GENERATED ) {
-		if ( appiter -> ref -> object_type == pnd_object_type_directory ) {
-
-		  // is this a subcat, a .., or a filesystem folder?
-		  //iconsurface = g_imagecache [ IMG_FOLDER ].i;
-		  if ( g_categories [ ui_category ] -> fspath ) {
-		    iconsurface = g_imagecache [ IMG_FOLDER ].i;
-		  } else if ( strcmp ( appiter -> ref -> title_en, ".." ) == 0 ) {
-		    iconsurface = g_imagecache [ IMG_DOTDOTFOLDER ].i;
-		  } else {
-		    iconsurface = g_imagecache [ IMG_SUBCATFOLDER ].i;
-		  }
-
-		} else {
-		  iconsurface = g_imagecache [ IMG_EXECBIN ].i;
-		}
-	      } else {
-		iconsurface = g_imagecache [ IMG_ICON_MISSING ].i;
-	      }
-
+	      dest -> x = c -> grid_offset_x + c -> text_clip_x;
+	      dest -> y = c -> grid_offset_y + ( displayrow * ( c -> text_height + c -> icon_offset_y ) ) - ( c -> icon_offset_y / 2 );
+	      SDL_BlitSurface ( ic -> itiny, NULL, sdl_realscreen, dest );
 	    }
 
-	    // got an icon I hope?
-	    if ( iconsurface ) {
-	      //pnd_log ( pndn_debug, "Got an icon for '%s'\n", IFNULL(appiter -> ref -> title_en,"No Name") );
-
-	      src.x = 0;
-	      src.y = 0;
-	      src.w = 60;
-	      src.h = 60;
-	      dest -> x = c -> grid_offset_x + ( col * c -> cell_width ) + c -> icon_offset_x + (( c -> icon_max_width - iconsurface -> w ) / 2);
-	      dest -> y = c -> grid_offset_y + ( displayrow * c -> cell_height ) + c -> icon_offset_y + (( c -> icon_max_height - iconsurface -> h ) / 2);
-
-	      SDL_BlitSurface ( iconsurface, &src, sdl_realscreen, dest );
-
-	      // store touch info
-	      ui_register_app ( appiter, dest -> x, dest -> y, src.w, src.h );
-
-	      dest++;
-
-	    }
-
-	    // show text
+	    // show title text
 	    if ( appiter -> ref -> title_en ) {
 	      SDL_Surface *rtext;
 	      rtext = TTF_RenderText_Blended ( g_grid_font, appiter -> ref -> title_en, c -> fontcolor );
 	      src.x = 0;
 	      src.y = 0;
-	      src.w = c -> text_width < rtext -> w ? c -> text_width : rtext -> w;
+	      src.w = hilight -> w; //c -> text_width < rtext -> w ? c -> text_width : rtext -> w;
 	      src.h = rtext -> h;
-	      if ( rtext -> w > c -> text_width ) {
-		dest -> x = c -> grid_offset_x + ( col * c -> cell_width ) + c -> text_clip_x;
-	      } else {
-		dest -> x = c -> grid_offset_x + ( col * c -> cell_width ) + c -> text_offset_x - ( rtext -> w / 2 );
+
+	      dest -> x = c -> grid_offset_x + c -> text_clip_x;
+	      dest -> x += 20; // so all title-text line up, regardless of icon presence
+#if 0
+	      if ( ic ) {
+		dest -> x += 20; //((SDL_Surface*)ic -> i) -> w;
 	      }
-	      dest -> y = c -> grid_offset_y + ( displayrow * c -> cell_height ) + c -> text_offset_y;
+#endif
+
+	      dest -> y = c -> grid_offset_y + ( displayrow * ( c -> text_height + c -> icon_offset_y ) );
 	      SDL_BlitSurface ( rtext, &src, sdl_realscreen, dest );
 	      SDL_FreeSurface ( rtext );
 	      dest++;
 	    }
 
-	  } // display now? or scrolled away..
+	  } // visible or scrolled?
 
-	  // next
+	  if ( row >= ui_rows_scrolled_down ) {
+	    displayrow++;
+	  }
+
+	  // are we done displaying rows?
+	  if ( displayrow >= icon_visible_rows ) {
+	    break;
+	  }
+
 	  appiter = appiter -> next;
+	  row++;
 
-	} // for column 1...X
+	} // while
 
-	if ( row >= ui_rows_scrolled_down ) {
-	  displayrow++;
-	}
+      } else {
 
-	row ++;
+	appiter = g_categories [ ui_category ] -> refs;
+	row = 0;
+	displayrow = 0;
 
-	// are we done displaying rows?
-	if ( displayrow >= c -> row_max ) {
-	  break;
-	}
+	// until we run out of apps, or run out of space
+	while ( appiter != NULL ) {
 
-      } // while
+	  for ( col = 0; col < c -> col_max && appiter != NULL; col++ ) {
+
+	    // do we even need to render it? or are we suppressing it due to rows scrolled off the top?
+	    if ( row >= ui_rows_scrolled_down ) {
+
+	      // selected? show hilights
+	      if ( appiter == ui_selected ) {
+		SDL_Surface *s = g_imagecache [ IMG_SELECTED_ALPHAMASK ].i;
+		// icon
+		//dest -> x = grid_offset_x + ( col * cell_width ) + icon_offset_x + ( ( icon_max_width - s -> w ) / 2 );
+		dest -> x = c -> grid_offset_x + ( col * c -> cell_width ) + c -> icon_offset_x + c -> sel_icon_offset_x;
+		//dest -> y = grid_offset_y + ( displayrow * cell_height ) + icon_offset_y + ( ( icon_max_height - s -> h ) / 2 );
+		dest -> y = c -> grid_offset_y + ( displayrow * c -> cell_height ) + c -> icon_offset_y + c -> sel_icon_offset_y;
+		SDL_BlitSurface ( s, NULL /* all */, sdl_realscreen, dest );
+		dest++;
+		// text
+		dest -> x = c -> grid_offset_x + ( col * c -> cell_width ) + c -> text_clip_x;
+		dest -> y = c -> grid_offset_y + ( displayrow * c -> cell_height ) + c -> text_hilite_offset_y;
+		SDL_BlitSurface ( g_imagecache [ IMG_SELECTED_HILITE ].i, NULL /* all */, sdl_realscreen, dest );
+		dest++;
+	      } // selected?
+
+	      // show icon
+	      mm_cache_t *ic = cache_query_icon ( appiter -> ref -> unique_id );
+	      SDL_Surface *iconsurface;
+
+	      // if icon not in cache, and its a pnd-file source, perhaps try to load it right now..
+	      if ( ( ! ic ) &&
+		   ( load_visible ) &&
+		   ( ! ( appiter -> ref -> object_flags & PND_DISCO_GENERATED ) )
+		 )
+	      {
+		// try to load any icons that..
+		// - are not yet loaded
+		// - did not fail a previous load attempt
+		// this way user can upfront load all icons, or defer all icons, or even defer all icons
+		// and still try to load visible ones 'just before needed'; so not at mmenu load time, but
+		// as needed (only the ones needed.)
+
+		if ( ( appiter -> ref -> pnd_icon_pos ) ||
+		     ( appiter -> ref -> icon && appiter -> ref -> object_flags & PND_DISCO_LIBPND_DD )
+		   )
+		{
+  
+		  // try to cache it?
+		  if ( ! cache_icon ( appiter -> ref, ui_display_context.icon_max_width, ui_display_context.icon_max_width ) ) {
+		    // erm..
+		  }
+
+		  // avoid churn
+		  appiter -> ref -> pnd_icon_pos = 0;
+		  if ( appiter -> ref -> icon ) {
+		    free ( appiter -> ref -> icon );
+		    appiter -> ref -> icon = NULL;
+		  }
+
+		  // pick up as if nothing happened..
+		  ic = cache_query_icon ( appiter -> ref -> unique_id );
+
+		}
+
+	      } // load icon during rendering?
+
+	      if ( ic ) {
+		iconsurface = ic -> i;
+	      } else {
+		//pnd_log ( pndn_warning, "WARNING: TBD: Need Missin-icon icon for '%s'\n", IFNULL(appiter -> ref -> title_en,"No Name") );
+
+		// no icon override; was this a pnd-file (show the unknown icon then), or was this generated from
+		// filesystem (file or directory icon)
+		if ( appiter -> ref -> object_flags & PND_DISCO_GENERATED ) {
+		  if ( appiter -> ref -> object_type == pnd_object_type_directory ) {
+
+		    // is this a subcat, a .., or a filesystem folder?
+		    //iconsurface = g_imagecache [ IMG_FOLDER ].i;
+		    if ( g_categories [ ui_category ] -> fspath ) {
+		      iconsurface = g_imagecache [ IMG_FOLDER ].i;
+		    } else if ( strcmp ( appiter -> ref -> title_en, ".." ) == 0 ) {
+		      iconsurface = g_imagecache [ IMG_DOTDOTFOLDER ].i;
+		    } else {
+		      iconsurface = g_imagecache [ IMG_SUBCATFOLDER ].i;
+		    }
+
+		  } else {
+		    iconsurface = g_imagecache [ IMG_EXECBIN ].i;
+		  }
+		} else {
+		  iconsurface = g_imagecache [ IMG_ICON_MISSING ].i;
+		}
+
+	      }
+
+	      // got an icon I hope?
+	      if ( iconsurface ) {
+		//pnd_log ( pndn_debug, "Got an icon for '%s'\n", IFNULL(appiter -> ref -> title_en,"No Name") );
+
+		src.x = 0;
+		src.y = 0;
+		src.w = 60;
+		src.h = 60;
+		dest -> x = c -> grid_offset_x + ( col * c -> cell_width ) + c -> icon_offset_x + (( c -> icon_max_width - iconsurface -> w ) / 2);
+		dest -> y = c -> grid_offset_y + ( displayrow * c -> cell_height ) + c -> icon_offset_y + (( c -> icon_max_height - iconsurface -> h ) / 2);
+
+		SDL_BlitSurface ( iconsurface, &src, sdl_realscreen, dest );
+
+		// store touch info
+		ui_register_app ( appiter, dest -> x, dest -> y, src.w, src.h );
+
+		dest++;
+
+	      }
+
+	      // show text
+	      if ( appiter -> ref -> title_en ) {
+		SDL_Surface *rtext;
+		rtext = TTF_RenderText_Blended ( g_grid_font, appiter -> ref -> title_en, c -> fontcolor );
+		src.x = 0;
+		src.y = 0;
+		src.w = c -> text_width < rtext -> w ? c -> text_width : rtext -> w;
+		src.h = rtext -> h;
+		if ( rtext -> w > c -> text_width ) {
+		  dest -> x = c -> grid_offset_x + ( col * c -> cell_width ) + c -> text_clip_x;
+		} else {
+		  dest -> x = c -> grid_offset_x + ( col * c -> cell_width ) + c -> text_offset_x - ( rtext -> w / 2 );
+		}
+		dest -> y = c -> grid_offset_y + ( displayrow * c -> cell_height ) + c -> text_offset_y;
+		SDL_BlitSurface ( rtext, &src, sdl_realscreen, dest );
+		SDL_FreeSurface ( rtext );
+		dest++;
+	      }
+
+	    } // display now? or scrolled away..
+
+	    // next
+	    appiter = appiter -> next;
+
+	  } // for column 1...X
+
+	  if ( row >= ui_rows_scrolled_down ) {
+	    displayrow++;
+	  }
+
+	  row ++;
+
+	  // are we done displaying rows?
+	  if ( displayrow >= c -> row_max ) {
+	    break;
+	  }
+
+	} // while
+
+      } // icon view
 
     } else {
       // no apps to render?
@@ -1628,6 +1759,16 @@ void ui_process_input ( pnd_dbusnotify_handle dbh, pnd_notify_handle nh ) {
 
 void ui_push_left ( unsigned char forcecoil ) {
 
+  if ( ui_viewmode == uiv_list ) {
+    ui_context_t *c = &ui_display_context;
+    int i;
+    int imax = ( c -> cell_height * c -> row_max ) / ( c -> text_height + c -> icon_offset_y ); // visible rows
+    for ( i = 0; i < imax; i++ ) {
+      ui_push_up();
+    }
+    return;
+  }
+
   if ( ! ui_selected ) {
     ui_push_right ( 0 );
     return;
@@ -1669,6 +1810,16 @@ void ui_push_left ( unsigned char forcecoil ) {
 
 void ui_push_right ( unsigned char forcecoil ) {
 
+  if ( ui_viewmode == uiv_list ) {
+    ui_context_t *c = &ui_display_context;
+    int i;
+    int imax = ( c -> cell_height * c -> row_max ) / ( c -> text_height + c -> icon_offset_y ); // visible rows
+    for ( i = 0; i < imax; i++ ) {
+      ui_push_down();
+    }
+    return;
+  }
+
   if ( ui_selected ) {
 
     // what column we in?
@@ -1708,9 +1859,34 @@ void ui_push_right ( unsigned char forcecoil ) {
 }
 
 void ui_push_up ( void ) {
+
   unsigned char col_max = ui_display_context.col_max;
 
+  // not selected? well, no where to go..
   if ( ! ui_selected ) {
+    return;
+  }
+
+  if ( ui_viewmode == uiv_list ) {
+
+    if ( g_categories [ ui_category ] -> refs == ui_selected ) {
+      // can't go any more up, we're at the head
+
+    } else {
+      // figure out the previous item; yay for singly linked list :/
+      mm_appref_t *i = g_categories [ ui_category ] -> refs;
+      while ( i ) {
+	if ( i -> next == ui_selected ) {
+	  ui_selected = i;
+	  break;
+	}
+	i = i -> next;
+      }
+
+    }
+
+    // for list view.. we're done
+    ui_set_selected ( ui_selected );
     return;
   }
 
@@ -1760,6 +1936,24 @@ void ui_push_up ( void ) {
 }
 
 void ui_push_down ( void ) {
+
+  if ( ui_viewmode == uiv_list ) {
+
+    if ( ui_selected ) {
+
+      if ( ui_selected -> next ) {
+	ui_selected = ui_selected -> next;
+      }
+
+    } else {
+      ui_selected = g_categories [ ui_category ] -> refs; // frist!
+    }
+
+    // list view? we're done.
+    ui_set_selected ( ui_selected );
+    return;
+  }
+
   unsigned char col_max = ui_display_context.col_max;
 
   if ( ui_selected ) {
@@ -3396,6 +3590,15 @@ void ui_recache_context ( ui_context_t *c ) {
   SDL_Color tmp = { c -> font_rgba_r, c -> font_rgba_g, c -> font_rgba_b, c -> font_rgba_a };
   c -> fontcolor = tmp;
 
+  // determine font height
+  if ( g_grid_font ) {
+    SDL_Surface *rtext;
+    rtext = TTF_RenderText_Blended ( g_grid_font, "M", c -> fontcolor );
+    c -> text_height = rtext -> h;
+  } else {
+    c -> text_height = 10;
+  }
+
   // now that we've got 'normal' (detail pane shown) param's, lets check if detail pane
   // is hidden; if so, override some values with those alternate skin values where possible.
   if ( ui_detail_hidden ) {
@@ -4161,7 +4364,7 @@ void ui_manage_categories ( void ) {
 	  // for now, force use of '*' into something else as we use * internally :/ (FIXME)
 	  {
 	    char *fixme;
-	    while ( fixme = strchr ( namebuf, '*' ) ) {
+	    while ( ( fixme = strchr ( namebuf, '*' ) ) ) {
 	      *fixme = '_';
 	    }
 	  }
@@ -4212,7 +4415,7 @@ void ui_manage_categories ( void ) {
 	    // for now, force use of '*' into something else as we use * internally :/ (FIXME)
 	    {
 	      char *fixme;
-	      while ( fixme = strchr ( namebuf, '*' ) ) {
+	      while ( ( fixme = strchr ( namebuf, '*' ) ) ) {
 		*fixme = '_';
 	      }
 	    }

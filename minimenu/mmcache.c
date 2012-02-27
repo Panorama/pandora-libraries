@@ -40,6 +40,7 @@
 #include "mmcache.h"
 #include "mmcat.h"
 #include "mmui.h"
+#include "mmui_context.h"
 
 extern pnd_conf_handle g_conf;
 extern unsigned char g_pvwcache;
@@ -346,6 +347,11 @@ unsigned char cache_icon ( pnd_disco_t *app, unsigned char maxwidth, unsigned ch
     s = scaled;
   }
 
+  // scale for tiny?
+  SDL_Surface *scaled_tiny = SDL_ConvertSurface ( s, s -> format, s -> flags );
+  extern ui_context_t ui_display_context;
+  scaled_tiny = ui_scale_image ( scaled_tiny, -1 , ui_display_context.text_height );
+
   // add to cache
   c = (mm_cache_t*) malloc ( sizeof(mm_cache_t) );
   bzero ( c, sizeof(mm_cache_t) );
@@ -359,6 +365,7 @@ unsigned char cache_icon ( pnd_disco_t *app, unsigned char maxwidth, unsigned ch
 
   strncpy ( c -> uniqueid, app -> unique_id, 1000 );
   c -> i = s;
+  c -> itiny = scaled_tiny;
 
   return ( 1 );
 }

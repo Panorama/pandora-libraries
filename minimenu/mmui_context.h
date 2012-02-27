@@ -31,6 +31,7 @@ typedef struct {
   unsigned int sel_icon_offset_y;
 
   unsigned int text_width;
+  unsigned int text_height; // grid text's height of an 'M'
   unsigned int text_clip_x;
   unsigned int text_offset_x;
   unsigned int text_offset_y;

@@ -37,6 +37,8 @@ typedef enum {
   IMG_SUBCATFOLDER,
   IMG_DOTDOTFOLDER,
   IMG_MAX, // before this point is loaded; after is generated
+  IMG_LIST_ALPHAMASK,
+  IMG_LIST_ALPHAMASK_W,
   IMG_TRUEMAX
 } mm_imgcache_e;
 
@@ -62,6 +64,12 @@ typedef enum {
   uisb_select = (1<<7),
   uisb_max
 } ui_sdl_button_e;
+
+typedef enum {
+  uiv_icons = 0,
+  uiv_list,
+  uiv_max
+} ui_viewmode_e;
 
 unsigned char ui_setup ( void );
 unsigned char ui_imagecache ( char *basepath );

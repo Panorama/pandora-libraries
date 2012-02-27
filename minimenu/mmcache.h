@@ -13,6 +13,7 @@
 typedef struct _mm_cache_t {
   char uniqueid [ 1024 ]; // pnd unique-id
   void /*SDL_Surface*/ *i;
+  void /*SDL_Surface*/ *itiny; // for list view
   // structure
   struct _mm_cache_t *next; // next in linked list
 } mm_cache_t;
