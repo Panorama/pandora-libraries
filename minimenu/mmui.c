@@ -801,10 +801,53 @@ void ui_render ( void ) {
 
 	    // show icon
 	    mm_cache_t *ic = cache_query_icon ( appiter -> ref -> unique_id );
+	    SDL_Surface *iconsurface = NULL;
+
+	    // if icon not in cache, and its a pnd-file source, perhaps try to load it right now..
+	    if ( ( ! ic ) &&
+		 ( load_visible ) &&
+		 ( ! ( appiter -> ref -> object_flags & PND_DISCO_GENERATED ) )
+	       )
+	    {
+	      // try to load any icons that..
+	      // - are not yet loaded
+	      // - did not fail a previous load attempt
+	      // this way user can upfront load all icons, or defer all icons, or even defer all icons
+	      // and still try to load visible ones 'just before needed'; so not at mmenu load time, but
+	      // as needed (only the ones needed.)
+
+	      if ( ( appiter -> ref -> pnd_icon_pos ) ||
+		   ( appiter -> ref -> icon && appiter -> ref -> object_flags & PND_DISCO_LIBPND_DD )
+		 )
+	      {
+  
+		// try to cache it?
+		if ( ! cache_icon ( appiter -> ref, ui_display_context.icon_max_width, ui_display_context.icon_max_width ) ) {
+		  // erm..
+		}
+
+		// avoid churn
+		appiter -> ref -> pnd_icon_pos = 0;
+		if ( appiter -> ref -> icon ) {
+		  free ( appiter -> ref -> icon );
+		  appiter -> ref -> icon = NULL;
+		}
+
+		// pick up as if nothing happened..
+		ic = cache_query_icon ( appiter -> ref -> unique_id );
+
+	      }
+
+	    } // load icon during rendering?
+
 	    if ( ic ) {
+	      iconsurface = ic -> itiny;
+	    }
+
+	    if ( iconsurface ) {
 	      dest -> x = c -> grid_offset_x + c -> text_clip_x;
 	      dest -> y = c -> grid_offset_y + ( displayrow * ( c -> text_height + c -> icon_offset_y ) ) - ( c -> icon_offset_y / 2 );
-	      SDL_BlitSurface ( ic -> itiny, NULL, sdl_realscreen, dest );
+	      SDL_BlitSurface ( iconsurface, NULL, sdl_realscreen, dest );
 	    }
 
 	    // show title text
