@@ -95,6 +95,7 @@ unsigned char ui_detail_hidden = 0;     // if >0, detail panel is hidden
 // FUTURE: If multiple panels can be shown/hidden, convert ui_detail_hidden to a bitmask
 
 SDL_Surface *ui_scale_image ( SDL_Surface *s, unsigned int maxwidth, int maxheight ); // height -1 means ignore
+
 static int ui_selected_index ( void );
 static void ui_start_defered_icon_thread ( void );
 static void ui_stop_defered_icon_thread ( void );
@@ -218,6 +219,18 @@ unsigned char ui_setup ( void ) {
   } else {
     ui_detail_hidden = 1;
   }
+
+  // determine default viewmode
+  if ( pnd_conf_get_as_int_d ( g_conf, "display.viewmode_list", -1 ) != -1 ) {
+    int i = pnd_conf_get_as_int_d ( g_conf, "display.viewmode_list", 0 );
+    if ( i >= uiv_max ) {
+      ui_viewmode = uiv_icons;
+    } else {
+      ui_viewmode = i;
+    }
+  }
+
+  // update display context
   ui_recache_context ( &ui_display_context );
 
   return ( 1 );
@@ -294,6 +307,14 @@ unsigned char ui_imagecache ( char *basepath ) {
       }
 
       if ( ( g_imagecache [ i ].i = IMG_Load ( fullpath ) ) ) {
+
+	// also make a 'tiny' version..
+	SDL_Surface *s = g_imagecache [ i ].i;
+	SDL_Surface *scaled_tiny = SDL_ConvertSurface ( s, s -> format, s -> flags ); // duplicate
+	extern ui_context_t ui_display_context;
+	scaled_tiny = ui_scale_image ( scaled_tiny, -1 , ui_display_context.text_height_tab ); // resize
+	g_imagecache [ i ].itiny = scaled_tiny;
+
 	break; // no retry needed
       } else {
 	pnd_log ( pndn_error, "ERROR: (Try %u) Couldn't load static cache image: %s\n", try + 1, fullpath );
@@ -438,7 +459,7 @@ void ui_render ( void ) {
       // max visible --> row-max == grid height / ( font-height + padding )
 
       icon_rows = g_categories [ ui_category ] -> refcount; // one app per row
-      icon_visible_rows = ( c -> cell_height * c -> row_max ) / ( c -> text_height + c -> icon_offset_y );
+      icon_visible_rows = ( c -> cell_height * c -> row_max ) / ( c -> text_height_tab + c -> icon_offset_y );
 
     } else {
 
@@ -792,9 +813,9 @@ void ui_render ( void ) {
 	      src.x = 0;
 	      src.y = 0;
 	      src.w = hilight -> w;
-	      src.h = c -> text_height + c -> icon_offset_y;
+	      src.h = c -> text_height_tab + c -> icon_offset_y;
 	      dest -> x = c -> grid_offset_x + c -> text_clip_x;
-	      dest -> y = c -> grid_offset_y + ( displayrow * ( c -> text_height + c -> icon_offset_y ) ) - ( c -> icon_offset_y / 2 );
+	      dest -> y = c -> grid_offset_y + ( displayrow * ( c -> text_height_tab + c -> icon_offset_y ) ) - ( c -> icon_offset_y / 2 );
 	      SDL_BlitSurface ( hilight, &src, sdl_realscreen, dest );
 	      dest++;
 	    }
@@ -842,32 +863,57 @@ void ui_render ( void ) {
 
 	    if ( ic ) {
 	      iconsurface = ic -> itiny;
+	    } else {
+	      //pnd_log ( pndn_warning, "WARNING: TBD: Need Missin-icon icon for '%s'\n", IFNULL(appiter -> ref -> title_en,"No Name") );
+
+	      // no icon override; was this a pnd-file (show the unknown icon then), or was this generated from
+	      // filesystem (file or directory icon)
+	      if ( appiter -> ref -> object_flags & PND_DISCO_GENERATED ) {
+		if ( appiter -> ref -> object_type == pnd_object_type_directory ) {
+
+		  // is this a subcat, a .., or a filesystem folder?
+		  //iconsurface = g_imagecache [ IMG_FOLDER ].i;
+		  if ( g_categories [ ui_category ] -> fspath ) {
+		    iconsurface = g_imagecache [ IMG_FOLDER ].itiny;
+		  } else if ( strcmp ( appiter -> ref -> title_en, ".." ) == 0 ) {
+		    iconsurface = g_imagecache [ IMG_DOTDOTFOLDER ].itiny;
+		  } else {
+		    iconsurface = g_imagecache [ IMG_SUBCATFOLDER ].itiny;
+		  }
+
+		} else {
+		  iconsurface = g_imagecache [ IMG_EXECBIN ].itiny;
+		}
+	      } else {
+		iconsurface = g_imagecache [ IMG_ICON_MISSING ].itiny;
+	      }
+
 	    }
 
 	    if ( iconsurface ) {
 	      dest -> x = c -> grid_offset_x + c -> text_clip_x;
-	      dest -> y = c -> grid_offset_y + ( displayrow * ( c -> text_height + c -> icon_offset_y ) ) - ( c -> icon_offset_y / 2 );
+	      dest -> y = c -> grid_offset_y + ( displayrow * ( c -> text_height_tab + c -> icon_offset_y ) ) - ( c -> icon_offset_y / 2 );
 	      SDL_BlitSurface ( iconsurface, NULL, sdl_realscreen, dest );
 	    }
 
 	    // show title text
 	    if ( appiter -> ref -> title_en ) {
 	      SDL_Surface *rtext;
-	      rtext = TTF_RenderText_Blended ( g_grid_font, appiter -> ref -> title_en, c -> fontcolor );
+	      rtext = TTF_RenderText_Blended ( g_tab_font, appiter -> ref -> title_en, c -> fontcolor );
 	      src.x = 0;
 	      src.y = 0;
 	      src.w = hilight -> w; //c -> text_width < rtext -> w ? c -> text_width : rtext -> w;
 	      src.h = rtext -> h;
 
 	      dest -> x = c -> grid_offset_x + c -> text_clip_x;
-	      dest -> x += 20; // so all title-text line up, regardless of icon presence
+	      dest -> x += 30; // so all title-text line up, regardless of icon presence
 #if 0
 	      if ( ic ) {
-		dest -> x += 20; //((SDL_Surface*)ic -> i) -> w;
+		dest -> x += 30; //((SDL_Surface*)ic -> i) -> w;
 	      }
 #endif
 
-	      dest -> y = c -> grid_offset_y + ( displayrow * ( c -> text_height + c -> icon_offset_y ) );
+	      dest -> y = c -> grid_offset_y + ( displayrow * ( c -> text_height_tab + c -> icon_offset_y ) );
 	      SDL_BlitSurface ( rtext, &src, sdl_realscreen, dest );
 	      SDL_FreeSurface ( rtext );
 	      dest++;
@@ -1812,7 +1858,7 @@ void ui_push_left ( unsigned char forcecoil ) {
   if ( ui_viewmode == uiv_list ) {
     ui_context_t *c = &ui_display_context;
     int i;
-    int imax = ( c -> cell_height * c -> row_max ) / ( c -> text_height + c -> icon_offset_y ); // visible rows
+    int imax = ( c -> cell_height * c -> row_max ) / ( c -> text_height_tab + c -> icon_offset_y ); // visible rows
     for ( i = 0; i < imax; i++ ) {
       ui_push_up();
     }
@@ -1863,7 +1909,7 @@ void ui_push_right ( unsigned char forcecoil ) {
   if ( ui_viewmode == uiv_list ) {
     ui_context_t *c = &ui_display_context;
     int i;
-    int imax = ( c -> cell_height * c -> row_max ) / ( c -> text_height + c -> icon_offset_y ); // visible rows
+    int imax = ( c -> cell_height * c -> row_max ) / ( c -> text_height_tab + c -> icon_offset_y ); // visible rows
     for ( i = 0; i < imax; i++ ) {
       ui_push_down();
     }
@@ -3647,6 +3693,14 @@ void ui_recache_context ( ui_context_t *c ) {
     c -> text_height = rtext -> h;
   } else {
     c -> text_height = 10;
+  }
+
+  if ( g_tab_font ) {
+    SDL_Surface *rtext;
+    rtext = TTF_RenderText_Blended ( g_tab_font, "M", c -> fontcolor );
+    c -> text_height_tab = rtext -> h;
+  } else {
+    c -> text_height_tab = 15;
   }
 
   // now that we've got 'normal' (detail pane shown) param's, lets check if detail pane

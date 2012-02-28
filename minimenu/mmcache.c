@@ -45,6 +45,7 @@
 extern pnd_conf_handle g_conf;
 extern unsigned char g_pvwcache;
 extern pnd_conf_handle g_desktopconf;
+SDL_Surface *ui_scale_image ( SDL_Surface *s, unsigned int maxwidth, int maxheight ); // height -1 means ignore
 
 mm_cache_t *g_icon_cache = NULL;
 mm_cache_t *g_preview_cache = NULL;

@@ -33,6 +33,7 @@ confitem_t page_general[] = {
   { "Show 'All' tab",                "Whethor an All tab is shown or not",                      "1",                "categories.do_all_cat",   ct_boolean },
   { "Show directory browser tabs",   "Show a tab for each SD card?",                            "0",                "filesystem.do_browser",   ct_boolean },
   { "Detail panel on start?",        "Show or hide the detail panel when menu starts",          "1",                "display.show_detail_pane", ct_boolean },
+  { "Default list view not icons?",  "Normally we default to icons view not list",              "0",                "display.viewmode_list",   ct_boolean },
   { "Sub-categories as folders?",    "If no, uses tabs instead of folders within tabs.",        "1",                "tabs.subcat_as_folders",  ct_boolean },
   { "Sub-category apps in their main cat?","If no, apps with subcategories are only in subcategories","1",          "tabs.subcat_to_parent",   ct_boolean },
   { "Remember selected app",         "On return to menu select previous app; default to selected", "1",             "minimenu.start_selected", ct_boolean },

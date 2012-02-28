@@ -47,6 +47,7 @@ typedef struct {
   char *confname;
   char *alt_confname;
   void /*SDL_Surface*/ *i;
+  void /*SDL_Surface*/ *itiny;
 } mm_imgcache_t;
 
 /* ui stuff
