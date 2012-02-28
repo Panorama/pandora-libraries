@@ -115,6 +115,12 @@ unsigned char pnd_emit_dotdesktop ( char *targetpath, char *pndrun, pnd_disco_t 
   if ( p -> alt_category2 ) {
     fprintf ( f, "X-Pandora-AltCategory2=%s\n", p -> alt_category2 );
   }
+  if ( p -> info_filename ) {
+    fprintf ( f, "X-Pandora-Info-Filename=%s\n", p -> info_filename );
+  }
+  if ( p -> info_name ) {
+    fprintf ( f, "X-Pandora-Info-Name=%s\n", p -> info_name );
+  }
 
 #if 0 // we let pnd_run.sh command line handle this instead of in .desktop
   if ( p -> startdir ) {
@@ -804,10 +810,13 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
   }
 
   if ( strstr ( ddpath, ".desktop" ) == NULL ) {
-    return ( NULL );
+    return ( NULL ); // no .desktop in filename, must be something else... skip!
   }
 
   if ( strstr ( ddpath, "info.desktop" ) != NULL ) {
+    // ".....info.desktop" is the 'document help' (README) emitted from a pnd, not an actual app; minimenu rather
+    // expects the doc-info as part of the main app, not a separate app.. so lets drop it here, to avoid doubling up
+    // the number of applications, needlessly..
     return ( NULL );
   }
 
@@ -887,6 +896,11 @@ pnd_disco_t *pnd_parse_dotdesktop ( char *ddpath, unsigned int flags ) {
       p -> alt_category1 = strdup ( dd + 23 );
     } else if ( strncmp ( dd, "X-Pandora-AltCategory2=", 23 ) == 0 ) {
       p -> alt_category2 = strdup ( dd + 23 );
+
+    } else if ( strncmp ( dd, "X-Pandora-Info-Filename=", 24 ) == 0 ) {
+      p -> info_filename = strdup ( dd + 24 );
+    } else if ( strncmp ( dd, "X-Pandora-Info-Name=", 20 ) == 0 ) {
+      p -> info_name = strdup ( dd + 20 );
 
     } else if ( strncmp ( dd, "Comment=", 8 ) == 0 ) {
       p -> desc_en = strdup ( dd + 8 );
