@@ -77,6 +77,7 @@ keycode_t keycodes[] = {
   { KEY_0, "0" },
   { KEY_BRIGHTNESSDOWN, "lcdbrightdown" },
   { KEY_BRIGHTNESSUP, "lcdbrightup" },
+  { KEY_COFFEE, "hold" }, /* coffee? lol */
   { -1, NULL }
 };
 
@@ -90,6 +91,12 @@ generic_event_t generics[] = {
   { EV_SW, 0, "lid-toggle" }, // expecting value 1 (lid close) or 0 (lid open)
   { -1, -1, NULL }
 };
+
+// FAKESCRIPT_ entries are to better handle a virtual script name; if we have to parse
+// "TOGGLE_HOLD" for every key down, it seems a little inefficient; at conf-time, if we
+// see this string for example, why not change it to a magic number .. and if we see that
+// down the road, we can act with just an integer compare, instead of a string compare..
+#define FAKESCRIPT_TOGGLE_HOLD 0001
 
 // event-to-sh mapping
 //
@@ -132,6 +139,10 @@ unsigned int bc_stopcur = 80000;  // charge current threshold as stop condition 
 unsigned char bc_startcap = 95;   // battery capacity threshold to resume charging
 char *bc_charge_devices = NULL;   // charger /sys/class/power_supply/ devices, changes between kernel versions
 
+// fd's; pulled from main() so I can be lazy
+int fds [ 8 ] = { -1, -1, -1, -1, -1, -1, -1, -1 }; // 0 = keypad, 1 = gpio keys
+int imaxfd = 0;
+
 /* get to it
  */
 void dispatch_key ( int keycode, int val );
@@ -139,6 +150,8 @@ void dispatch_event ( int code, int val );
 void sigchld_handler ( int n );
 unsigned char set_next_alarm ( unsigned int secs, unsigned int usecs );
 void sigalrm_handler ( int n );
+void fakescript_hold_on ( void );
+void fakescript_hold_off ( void );
 
 static void usage ( char *argv[] ) {
   printf ( "%s [-d]\n", argv [ 0 ] );
@@ -327,6 +340,11 @@ int main ( int argc, char *argv[] ) {
 	} else {
 	  g_evmap [ g_evmap_max ].script = n;
 	  g_evmap [ g_evmap_max ].maxhold = 0;
+
+	  if ( strcmp ( n, "TOGGLE_HOLD" ) == 0 ) {
+	    g_evmap [ g_evmap_max ].script = (char*)FAKESCRIPT_TOGGLE_HOLD;
+	  }
+
 	}
 
 	pnd_log ( pndn_rem, "Registered key %s [%d] to script %s with maxhold %d\n",
@@ -483,8 +501,6 @@ int main ( int argc, char *argv[] ) {
 
   // try to locate the appropriate devices
   int id;
-  int fds [ 8 ] = { -1, -1, -1, -1, -1, -1, -1, -1 }; // 0 = keypad, 1 = gpio keys
-  int imaxfd = 0;
 
   for ( id = 0; ; id++ ) {
     char fname[64];
@@ -714,8 +730,17 @@ void dispatch_key ( int keycode, int val ) {
 	// keydown
 
 	if ( g_evmap [ i ].maxhold == 0 ) {
-	  g_evmap [ i ].keydown_time = 0;
-	  invoke_it = 1;
+
+	  // is this a special internally handled key, or normal key?
+	  if ( g_evmap [ i ].script == (char*)FAKESCRIPT_TOGGLE_HOLD ) {
+	    // handle this specially
+	    fakescript_hold_on();
+	  } else {
+	    // normal key, with script to run
+	    g_evmap [ i ].keydown_time = 0;
+	    invoke_it = 1;
+	  }
+
 	} else {
 	  g_evmap [ i ].keydown_time = time ( NULL );
 	}
@@ -729,13 +754,21 @@ void dispatch_key ( int keycode, int val ) {
 	  invoke_it = 1;
 	}
 
-      } else if ( val == 0 && g_evmap [ i ].keydown_time ) {
-	// keyup (while key is down)
+      } else if ( val == 0 ) {
 
-	if ( time ( NULL ) - g_evmap [ i ].last_trigger_time >= g_minimum_separation ) {
-	  invoke_it = 1;
-	} else {
-	  pnd_log ( pndn_rem, "Skipping invokation.. falls within minimum_separation threshold\n" );
+	if ( g_evmap [ i ].script == (char*)FAKESCRIPT_TOGGLE_HOLD ) {
+	  // handle this specially
+	  fakescript_hold_off();
+
+	} else if ( g_evmap [ i ].keydown_time ) {
+	  // keyup (while key is down)
+
+	  if ( time ( NULL ) - g_evmap [ i ].last_trigger_time >= g_minimum_separation ) {
+	    invoke_it = 1;
+	  } else {
+	    pnd_log ( pndn_rem, "Skipping invokation.. falls within minimum_separation threshold\n" );
+	  }
+
 	}
 
       } // key up or down?
@@ -997,6 +1030,28 @@ void sigalrm_handler ( int n ) {
     b_active = 1;
     set_next_alarm ( b_blinkfreq, 0 );
   } // battery level
+
+  return;
+}
+
+void fakescript_hold_on ( void ) {
+  pnd_log ( pndn_rem, "HOLD is being enabled.\n" );
+
+  int i;
+  for ( i = 0; i < imaxfd; i++ ) {
+    ioctl ( fds [ i ], EVIOCGRAB, 1 /* enable */ );
+  }
+
+  return;
+}
+
+void fakescript_hold_off ( void ) {
+  pnd_log ( pndn_rem, "HOLD is being disabled.\n" );
+
+  int i;
+  for ( i = 0; i < imaxfd; i++ ) {
+    ioctl ( fds [ i ], EVIOCGRAB, 0 /* disable */ );
+  }
 
   return;
 }

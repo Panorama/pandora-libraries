@@ -3,12 +3,15 @@
 # Event-to-shscript map configuration
 
 [keys]
-# pass 'hold duration' to the script
+# passes a 'hold duration' to the script
 # if a number follows script name, will always force invocation at that time (or less)
+# if script to execute does not lead with a path, it is an internal function instead
+#   internal functions that exist: TOGGLE_HOLD
 pandora /usr/pandora/scripts/op_menu.sh 2
 power	/usr/pandora/scripts/op_power.sh 3
 lcdbrightdown	/usr/pandora/scripts/op_bright_down.sh
 lcdbrightup	/usr/pandora/scripts/op_bright_up.sh
+hold		TOGGLE_HOLD
 
 [events]
 # pass 'action code' to the script
