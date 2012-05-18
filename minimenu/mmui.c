@@ -1484,7 +1484,16 @@ void ui_process_input ( pnd_dbusnotify_handle dbh, pnd_notify_handle nh ) {
 	}
 
 	if ( watch_dbus || watch_inotify ) {
+
 	  pnd_log ( pndn_debug, "dbusnotify detected SD event\n" );
+
+	  // sometimes mmenu notices the SD event before pndnotifyd does, since pndnotifyd
+	  // is coded not to react too quickly (in the event of multiple spammed events or
+	  // other weird stuff that was seen when it was being written.) As such, lets wait
+	  // a second to give pndnotifyd a chance to have awoken..
+	  SDL_Delay ( 1500 ); // in 1/1000th of seconds
+
+	  // kick off a rescan
 	  applications_free();
 	  applications_scan();
 
