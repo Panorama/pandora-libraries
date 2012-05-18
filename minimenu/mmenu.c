@@ -555,10 +555,15 @@ void applications_scan ( void ) {
       }
     }
 
-    // aux apps?
+  } // app discovery on pnd-files?
+
+  // aux ("mmenu specific") apps?
+  if ( pnd_conf_get_as_char ( g_conf, "minimenu.aux_searchpath" ) ) {
     char *aux_apps = NULL;
     merge_apps = 0;
+
     aux_apps = pnd_conf_get_as_char ( g_conf, "minimenu.aux_searchpath" );
+
     if ( aux_apps && aux_apps [ 0 ] ) {
       pnd_log ( pndn_debug, "Looking for pnd applications here: %s\n", aux_apps );
       merge_apps = pnd_disco_search ( aux_apps, NULL );
@@ -595,7 +600,7 @@ void applications_scan ( void ) {
       }
     }
 
-  } // app discovery on pnd-files?
+  } // aux apps?
 
   // perform app discovery on .desktop files?
   //
